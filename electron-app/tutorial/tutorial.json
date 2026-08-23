@@ -1,0 +1,205 @@
+[
+  {
+    "id": 1,
+    "title": "创建新故事",
+    "desc": "欢迎来到御备团！作为GM，第一步是创建一个故事容器。点击'创建新故事'开始你的旅程。",
+    "targetSelector": ".fm-item[data-fm-texts*='创建新故事']",
+    "waitEvent": "createStoryClicked",
+    "waitFilter": {}
+  },
+  {
+    "id": 2,
+    "title": "导入教学模组",
+    "desc": "GM带团离不开模组。点击'选择文档'按钮，在安装目录的 CoolForPrepareTRPG/resources/tutorial/module.docx 中选择教学模组。",
+    "targetSelector": ".form-file-btn",
+    "waitEvent": "docFileSelected",
+    "waitFilter": {},
+    "offset": 15
+  },
+  {
+    "id": 3,
+    "title": "创建教学模组",
+    "desc": "模组名称和游戏系统已经为你预设好了，你也可以根据自己的喜好调整。准备好了就点击'创建模组'按钮。",
+    "targetSelector": "#createConfirmBtn",
+    "waitEvent": "storyCreated",
+    "waitFilter": { "isTutorial": true },
+    "offset": 15
+  },
+  {
+    "id": 4,
+    "title": "归类PL角色",
+    "desc": "模组里的角色信息应该归到数据库。选中编辑器中的'石头 - 矮人战士'描述文字，点击右键→选择'角色'库进行归类。",
+    "targetSelector": "#editorContent",
+    "waitEvent": "noteAddedToDatabase",
+    "waitFilter": {},
+    "highlightTexts": ["姓名：石头", "种族：矮人", "职业：战士", "生命值：28", "护甲：16", "武器：战斧", "刚刚抵达小镇"]
+  },
+  {
+    "id": 5,
+    "title": "归类敌对角色",
+    "desc": "同样地，把哥布林斥候的文字描述也归类到'角色'库。带团时这两类角色是战斗的核心。",
+    "targetSelector": "#editorContent",
+    "waitEvent": "noteAddedToDatabase",
+    "waitFilter": {},
+    "highlightTexts": ["姓名：哥布林斥候", "生命值：7", "护甲：13", "武器：短弓", "在酒馆外埋伏"]
+  },
+  {
+    "id": 6,
+    "title": "归类CG场景",
+    "desc": "最后把酒馆场景描述文字归到'主线CG'库。CG是你带团时的叙事参考。",
+    "targetSelector": "#editorContent",
+    "waitEvent": "noteAddedToDatabase",
+    "waitFilter": {},
+    "highlightTexts": ["夜幕降临", "壁炉的火光", "神秘的老者"]
+  },
+  {
+    "id": 7,
+    "title": "进入带团板",
+    "desc": "数据准备就绪！现在点击导航栏右侧的'进入带团板'按钮，那里是你带团时的主战场。",
+    "targetSelector": ".navbar-btn[onclick*='switchToBoard']",
+    "waitEvent": "boardEntered",
+    "waitFilter": {}
+  },
+  {
+    "id": 10,
+    "title": "打开数据库面板",
+    "desc": "点击工具栏右侧的'数据库'按钮，打开数据库面板。刚才归类的数据都在这里。",
+    "targetSelector": ".board-toolbar button[onclick*='toggleDbPanel']",
+    "waitEvent": "dbPanelOpened",
+    "waitFilter": {}
+  },
+  {
+    "id": 11,
+    "title": "点击添加便签",
+    "desc": "把刚刚归类的数据添加到画布上：从数据库面板里，找到CG便签、PL便签、敌对便签各点击添加一个到画布上。这就是你带团时的场景布局。",
+    "targetSelector": "#boardViewport",
+    "interactiveSelector": "#boardDbPanel, #boardViewport",
+    "waitEvent": "notesPlaced",
+    "waitFilter": { "count": 3 },
+    "holeExpand": 4
+  },
+  {
+    "id": 12,
+    "title": "拖拽便签位置",
+    "desc": "三个便签可能叠在一起了。在画布上拖拽便签，把它们分开摆放好，方便后续连线。完成后点击下方按钮。",
+    "targetSelector": "#boardViewport",
+    "interactiveSelector": "#boardViewport",
+    "advanceButton": true
+  },
+  {
+    "id": 13,
+    "title": "连线串联逻辑",
+    "desc": "GM的流程是有逻辑的：点击'连线模式'按钮，然后在画布上从一个便签拖到另一个便签，连接2条连线，形成带团时的推进链路。\n\n（新增）自定义编辑连线。试试点击连线吧",
+    "targetSelector": "#toolConnectBtn",
+    "interactiveSelector": ".board-page",
+    "waitEvent": "connectionsMade",
+    "waitFilter": { "count": 2 },
+    "offset": 15
+  },
+  {
+    "id": 14,
+    "title": "退出连线模式",
+    "desc": "完成连线后，右键点击画布任意位置退出连线模式。带团时完成逻辑链路搭建后，记得退出连线模式才能进行其他操作。",
+    "targetSelector": "#boardViewport",
+    "interactiveSelector": "#boardViewport",
+    "waitEvent": "connectModeExited",
+    "checkConnectMode": true
+  },
+  {
+    "id": 15,
+    "title": "添加战斗模块",
+    "desc": "遭遇战是DnD的核心。点击工具栏的金色盾牌图标，在画布上放置一个战斗部署卡。",
+    "targetSelector": ".tool-btn[onclick*='createBattleDeployment']",
+    "waitEvent": "battleDeploymentCreated",
+    "waitFilter": {}
+  },
+  {
+    "id": 16,
+    "title": "打开战斗",
+    "desc": "好！现在点击画布上战斗部署卡里的'打开战斗'按钮，进入战斗界面。",
+    "targetSelector": ".bdc-open-btn",
+    "waitEvent": "battleOpened",
+    "waitFilter": {}
+  },
+  {
+    "id": 17,
+    "title": "打开添加人员面板",
+    "desc": "点击战斗界面上方的'+ 添加'按钮，打开添加参战人员窗口。",
+    "targetSelector": "#boSidebarAddBtn",
+    "waitEvent": "addPanelOpened",
+    "waitFilter": {}
+  },
+  {
+    "id": 18,
+    "title": "添加参战人员",
+    "desc": "在添加参战人员窗口中，选中石头和哥布林斥候，确认添加。把他们俩拉入先攻序！",
+    "targetSelector": "#boAddParticipantPanel",
+    "interactiveSelector": "#boSidebarAddBtn, #boAddParticipantPanel",
+    "waitEvent": "combatantsAdded",
+    "waitFilter": { "count": 2 }
+  },
+  {
+    "id": 19,
+    "title": "填写先攻值",
+    "desc": "在横向先攻序列表中，点击石头和哥布林的init占位，分别填入先攻值：石头=18，哥布林=12。",
+    "targetSelector": "#boTurnList",
+    "waitEvent": "initiativeChanged",
+    "waitFilter": {}
+  },
+  {
+    "id": 20,
+    "title": "开始战斗",
+    "desc": "一切就绪！点击'开始战斗'按钮，战斗正式启动——先攻值最高的角色（石头，18）将首先获得行动权。带团时每次点击此按钮都会轮到下一位角色行动。",
+    "targetSelector": "#boEndTurnBtn",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "endTurnClicked",
+    "waitFilter": {},
+    "offset": 15
+  },
+  {
+    "id": 21,
+    "title": "发起攻击行动",
+    "desc": "在数值输入框填写伤害数值，然后点击'攻击'按钮。当前回合高亮角色即为行动发出者。",
+    "targetSelector": "#boActionBarFloat",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "actionSelected",
+    "waitFilter": { "action": "damage" }
+  },
+  {
+    "id": 22,
+    "title": "选择目标并确认",
+    "desc": "点击画布上的受击者角色卡片（任意目标均可，四种行动皆支持多选），然后点击这个'确认'按钮。",
+    "targetSelector": "#boTooltipConfirm",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "actionExecuted",
+    "waitFilter": { "action": "damage" },
+    "offset": 15
+  },
+  {
+    "id": 23,
+    "title": "施加特殊状态",
+    "desc": "点击'施加状态'按钮，打开状态施加窗口。",
+    "targetSelector": ".bo-action-btn.status",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "actionSelected",
+    "waitFilter": { "action": "status" }
+  },
+  {
+    "id": 24,
+    "title": "设置状态并确认",
+    "desc": "输入状态持续回合数（例如2），点击任意状态按钮（如'流血'），然后选择哥布林为目标，确认施加。",
+    "targetSelector": "#boStatusPicker",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "actionExecuted",
+    "waitFilter": { "action": "status" }
+  },
+  {
+    "id": 25,
+    "title": "结束回合",
+    "desc": "现在轮到哥布林的回合了。点击'结束回合'按钮，完成这一轮战斗。恭喜通关教学！",
+    "targetSelector": "#boEndTurnBtn",
+    "interactiveSelector": "#battleOverlay",
+    "waitEvent": "endTurnClicked",
+    "waitFilter": {}
+  }
+]

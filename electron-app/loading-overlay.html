@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>加载中</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  }
+
+  .overlay {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    transition: opacity 0.5s ease;
+  }
+
+  /* 呼吸环 */
+  .rings {
+    position: relative;
+    width: 72px;
+    height: 72px;
+    margin-bottom: 48px;
+  }
+  .ring {
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    animation: breathe 2.2s ease-in-out infinite;
+  }
+  .ring-1 { animation-delay: 0s; }
+  .ring-2 { inset: 7px; animation-delay: 0.35s; }
+  .ring-3 { inset: 14px; animation-delay: 0.7s; }
+
+  @keyframes breathe {
+    0%, 100% { opacity: 0.25; transform: scale(0.88); }
+    50% { opacity: 1; transform: scale(1.06); }
+  }
+
+  /* 3D 纵深文字容器 */
+  .depth-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+  .depth-text-wrapper {
+    perspective: 900px;
+    perspective-origin: center center;
+    display: flex;
+    justify-content: center;
+  }
+  .depth-text-stage {
+    display: inline-block;
+    position: relative;
+    transform-style: preserve-3d;
+    white-space: nowrap;
+  }
+  .depth-text-layer {
+    position: absolute;
+    top: 0; left: 0;
+    white-space: nowrap;
+    user-select: none;
+    pointer-events: none;
+    font-weight: 900;
+    letter-spacing: 2px;
+  }
+  .depth-text-face {
+    position: relative;
+    white-space: nowrap;
+    user-select: none;
+    z-index: 999;
+    font-weight: 900;
+    letter-spacing: 2px;
+    /* 阴影增强立体感 */
+    text-shadow: 0 18px 30px rgba(0,0,0,0.22), 0 3px 6px rgba(0,0,0,0.18);
+  }
+  .depth-primary .depth-text-layer,
+  .depth-primary .depth-text-face {
+    font-size: clamp(2rem, 8vw, 4.5rem);
+    line-height: 1.1;
+  }
+  .depth-sub .depth-text-layer,
+  .depth-sub .depth-text-face {
+    font-size: clamp(0.85rem, 3vw, 1.4rem);
+    line-height: 1.2;
+    font-weight: 600;
+    letter-spacing: 3px;
+  }
+</style>
+</head>
+<body>
+  <div class="overlay" id="overlay">
+    <div class="rings">
+      <div class="ring ring-1"></div>
+      <div class="ring ring-2"></div>
+      <div class="ring ring-3"></div>
+    </div>
+    <div class="depth-stack">
+      <div class="depth-text-wrapper depth-primary" id="depthPrimary"></div>
+      <div class="depth-text-wrapper depth-sub" id="depthSub"></div>
+    </div>
+  </div>
+
+<script>
+  /*
+   * =========================================================================
+   * DepthText — 原生 JS 3D 纵深文字动效
+   *
+   * 原理：创建多层 span，每层 translateZ 向后偏移，颜色用 color-mix 渐变，
+   *       requestAnimationFrame 驱动自动微旋转（auto-orbit）。
+   * =========================================================================
+   */
+  class DepthText {
+    constructor(wrapper, options = {}) {
+      this.wrapper = wrapper;
+      this.text = options.text || 'Hello';
+      this.layers = Math.min(Math.max(Math.round(options.layers || 22), 4), 48);
+      this.depth = Math.min(Math.max(options.depth || 2.2, 0), 10);
+      this.faceColor = options.faceColor || '#f8fafc';
+      this.depthColor = options.depthColor || '#7c3aed';
+      this.tilt = Math.min(Math.max(options.tilt || 6, 0), 12);
+      this.smoothing = Math.min(Math.max(options.smoothing || 0.12, 0.02), 0.35);
+      this.orbitSpeed = Math.min(Math.max(options.orbitSpeed || 0.3, 0), 2);
+
+      this._current = { x: -this.tilt * 0.3, y: this.tilt * 0.4 };
+      this._target = { ...this._current };
+      this._frameId = null;
+      this._startTime = performance.now();
+
+      this._build();
+      this._animate();
+    }
+
+    /* 获取第 index 层（从后往前，index 越大越靠近表面）的颜色 */
+    _layerColor(index, total) {
+      const progress = index / total;
+      const eased = progress * progress;
+      const faceMix = Math.round((1 - eased) * 68 + 6);
+      return `color-mix(in srgb, ${this.faceColor} ${faceMix}%, ${this.depthColor})`;
+    }
+
+    _build() {
+      this.wrapper.style.perspective = '900px';
+      this.wrapper.style.perspectiveOrigin = 'center center';
+
+      const stage = document.createElement('div');
+      stage.className = 'depth-text-stage';
+      this._stage = stage;
+
+      const total = this.layers;
+      for (let i = 0; i < total; i++) {
+        const index = total - i;
+        const layer = document.createElement('span');
+        layer.className = 'depth-text-layer';
+        layer.textContent = this.text;
+        layer.setAttribute('aria-hidden', 'true');
+        layer.style.color = this._layerColor(index, total);
+        layer.style.transform = `translateZ(${-index * this.depth}px)`;
+        stage.appendChild(layer);
+      }
+
+      const face = document.createElement('span');
+      face.className = 'depth-text-face';
+      face.textContent = this.text;
+      face.style.color = this.faceColor;
+      stage.appendChild(face);
+
+      this.wrapper.appendChild(stage);
+    }
+
+    _animate() {
+      // 鼠标跟随
+      const handleMove = (e) => {
+        const rect = this.wrapper.getBoundingClientRect();
+        if (!rect.width || !rect.height) return;
+        const mx = Math.max(-1, Math.min(1, (e.clientX - (rect.left + rect.width / 2)) / (rect.width * 0.8)));
+        const my = Math.max(-1, Math.min(1, (e.clientY - (rect.top + rect.height / 2)) / (rect.height * 0.8)));
+        this._mouseX = mx;
+        this._mouseY = my;
+        this._hasMouse = true;
+      };
+      const handleLeave = () => {
+        this._hasMouse = false;
+      };
+      window.addEventListener('pointermove', handleMove);
+      window.addEventListener('pointerleave', handleLeave);
+      this._cleanup = () => {
+        window.removeEventListener('pointermove', handleMove);
+        window.removeEventListener('pointerleave', handleLeave);
+      };
+
+      const tick = (now) => {
+        const elapsed = (now - this._startTime) / 1000;
+        const orbit = elapsed * this.orbitSpeed * Math.PI * 2;
+
+        if (this._hasMouse) {
+          // 鼠标跟随倾斜
+          this._target.x = -this._mouseY * this.tilt;
+          this._target.y = this._mouseX * this.tilt;
+        } else {
+          // 自动微旋转
+          this._target.x = -this.tilt * 0.9 + Math.sin(orbit) * this.tilt * 1.2;
+          this._target.y = this.tilt * 1.2 + Math.cos(orbit * 0.85) * this.tilt * 1.2;
+        }
+
+        // 平滑插值
+        this._current.x += (this._target.x - this._current.x) * this.smoothing;
+        this._current.y += (this._target.y - this._current.y) * this.smoothing;
+
+        this._stage.style.transform =
+          `rotateX(${this._current.x.toFixed(3)}deg) rotateY(${this._current.y.toFixed(3)}deg)`;
+
+        this._frameId = requestAnimationFrame(tick);
+      };
+
+      this._frameId = requestAnimationFrame(tick);
+    }
+
+    destroy() {
+      if (this._frameId) {
+        cancelAnimationFrame(this._frameId);
+        this._frameId = null;
+      }
+      if (this._cleanup) {
+        this._cleanup();
+        this._cleanup = null;
+      }
+    }
+  }
+
+  /*
+   * =========================================================================
+   * 主题配色
+   * =========================================================================
+   */
+  const THEMES = {
+    'default': {
+      label: '暖羊皮纸',
+      bg: 'rgba(248, 246, 242, 0.97)',
+      ring1: '#c0ab84',
+      ring2: '#d4c4a0',
+      ring3: '#b8a070',
+      faceColor: '#f5f0e8',
+      depthColor: '#c0ab84'
+    },
+    'dark-forest': {
+      label: '暗夜森林',
+      bg: 'rgba(18, 26, 18, 0.97)',
+      ring1: '#8cc08c',
+      ring2: '#a0d0a0',
+      ring3: '#6a9a6a',
+      faceColor: '#e0f0e0',
+      depthColor: '#8cc08c'
+    }
+  };
+
+  /* 从 URL 获取主题 */
+  const urlTheme = new URLSearchParams(window.location.search).get('theme');
+  const theme = THEMES[urlTheme] ? urlTheme : 'default';
+  const cfg = THEMES[theme];
+
+  /* 应用主题到 overlay 背景和呼吸环 */
+  const overlay = document.getElementById('overlay');
+  overlay.style.background = cfg.bg;
+
+  document.querySelector('.ring-1').style.borderTopColor = cfg.ring1;
+  document.querySelector('.ring-1').style.borderRightColor = cfg.ring1;
+  document.querySelector('.ring-2').style.borderTopColor = cfg.ring2;
+  document.querySelector('.ring-2').style.borderLeftColor = cfg.ring2;
+  document.querySelector('.ring-3').style.borderRightColor = cfg.ring3;
+  document.querySelector('.ring-3').style.borderBottomColor = cfg.ring3;
+
+  /* 启动 3D 纵深文字 */
+  new DepthText(document.getElementById('depthPrimary'), {
+    text: '加载中...',
+    layers: 24,
+    depth: 2.2,
+    faceColor: cfg.faceColor,
+    depthColor: cfg.depthColor,
+    tilt: 6,
+    smoothing: 0.3,
+    orbitSpeed: 0.3
+  });
+
+  new DepthText(document.getElementById('depthSub'), {
+    text: 'Loading...',
+    layers: 16,
+    depth: 1.4,
+    faceColor: cfg.faceColor,
+    depthColor: cfg.depthColor,
+    tilt: 4,
+    smoothing: 0.3,
+    orbitSpeed: 0.25
+  });
+</script>
+</body>
+</html>

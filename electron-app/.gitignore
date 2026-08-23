@@ -1,0 +1,23 @@
+# 依赖
+node_modules/
+
+# 包管理
+package-lock.json
+
+# 备份文件
+*.backup
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# 打包产物
+dist/
+
+# 开发版运行时生成（npx electron . 环境，app.isPackaged === false）
+data/
+cfpt-config.json

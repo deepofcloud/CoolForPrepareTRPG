@@ -1,0 +1,1312 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>COC 7th - 角色系统原型 V2</title>
+<style>
+  :root {
+    --bg-deep: #0d0d1a;
+    --bg-panel: #151528;
+    --bg-card: #1c1c35;
+    --bg-input: #12122a;
+    --border: #2a2a4a;
+    --border-focus: #5a4fcf;
+    --text: #d4d4e8;
+    --text-dim: #7a7a9a;
+    --text-muted: #4a4a6a;
+    --accent: #7c6fdf;
+    --accent-dim: #5a4fcf;
+    --hp-color: #cf4f4f;
+    --san-color: #4f7fcf;
+    --luck-color: #cfaf4f;
+    --mp-color: #9f4fcf;
+    --success: #4fcf7f;
+    --warning: #cfaf4f;
+    --danger: #cf4f4f;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: var(--bg-deep);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+  }
+
+  /* ===== Top Bar ===== */
+  .topbar {
+    display: flex; align-items: center; gap: 16px;
+    padding: 12px 24px;
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .topbar h1 { font-size: 15px; font-weight: 600; color: var(--accent); letter-spacing: 1px; white-space: nowrap; }
+  .topbar .sep { width: 1px; height: 20px; background: var(--border); }
+  .view-tabs { display: flex; gap: 4px; }
+  .view-tab {
+    padding: 6px 16px; border-radius: 6px;
+    border: 1px solid transparent; background: none;
+    color: var(--text-dim); font-size: 13px; cursor: pointer; transition: all .2s;
+  }
+  .view-tab:hover { color: var(--text); background: rgba(124,111,223,.08); }
+  .view-tab.active { color: var(--accent); background: rgba(124,111,223,.12); border-color: var(--accent-dim); }
+  .topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  .edit-toggle {
+    padding: 5px 14px; border-radius: 6px;
+    border: 1px solid var(--border); background: none;
+    color: var(--text-dim); font-size: 12px; cursor: pointer; transition: all .2s;
+    display: none;
+  }
+  .edit-toggle:hover { border-color: var(--accent-dim); color: var(--text); }
+  .edit-toggle.active { background: rgba(124,111,223,.15); border-color: var(--accent); color: var(--accent); }
+  .topbar select {
+    background: var(--bg-input); border: 1px solid var(--border);
+    color: var(--text); padding: 4px 10px; border-radius: 4px; font-size: 13px;
+  }
+  .topbar .char-label { font-size: 13px; color: var(--text-dim); }
+
+  /* ===== View Container ===== */
+  .view { display: none; padding: 24px; max-width: 1100px; margin: 0 auto; }
+  .view.active { display: block; }
+
+  /* ===== Shared Components ===== */
+  .section-title {
+    font-size: 13px; font-weight: 600; color: var(--text-dim);
+    letter-spacing: 2px; margin-bottom: 12px; padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .collapsible {
+    margin-bottom: 16px; border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; background: var(--bg-card);
+  }
+  .collapsible-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; cursor: pointer; user-select: none; transition: background .15s;
+  }
+  .collapsible-header:hover { background: rgba(255,255,255,.02); }
+  .collapsible-header .ch-icon { width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; color: var(--accent); font-size: 14px; }
+  .collapsible-header .ch-title { font-size: 14px; font-weight: 600; flex: 1; }
+  .collapsible-header .ch-badge { font-size: 11px; color: var(--text-muted); padding: 1px 8px; background: rgba(255,255,255,.04); border-radius: 8px; }
+  .collapsible-header .ch-arrow { color: var(--text-muted); transition: transform .2s; font-size: 12px; }
+  .collapsible.open .ch-arrow { transform: rotate(90deg); }
+  .collapsible-body { display: none; padding: 0 16px 16px; }
+  .collapsible.open .collapsible-body { display: block; }
+
+  /* ===== VIEW 1: Character Album ===== */
+  .char-header { display: flex; gap: 20px; align-items: flex-start; margin-bottom: 24px; }
+  .char-portrait {
+    width: 100px; height: 100px; border-radius: 12px;
+    background: var(--bg-card); border: 2px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px; color: var(--text-muted); flex-shrink: 0; overflow: hidden;
+  }
+  .char-info { flex: 1; }
+  .char-name-row { display: flex; align-items: baseline; gap: 12px; margin-bottom: 8px; }
+  .char-name { font-size: 22px; font-weight: 700; color: #fff; }
+  .char-occupation { font-size: 13px; color: var(--accent); padding: 2px 10px; background: rgba(124,111,223,.12); border-radius: 10px; }
+  .char-meta { display: flex; gap: 20px; font-size: 13px; color: var(--text-dim); flex-wrap: wrap; }
+  .char-meta span { display: flex; align-items: center; gap: 4px; }
+  .char-meta .label { color: var(--text-muted); }
+
+  /* Edit mode */
+  .edit-form { margin-bottom: 24px; }
+  .edit-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 16px; }
+  .edit-field { display: flex; flex-direction: column; gap: 4px; }
+  .edit-field label { font-size: 11px; color: var(--text-muted); }
+  .edit-field input, .edit-field select {
+    background: var(--bg-input); border: 1px solid var(--border); color: var(--text);
+    padding: 6px 10px; border-radius: 6px; font-size: 13px; outline: none; transition: border-color .2s;
+  }
+  .edit-field input:focus { border-color: var(--border-focus); }
+  .edit-actions { display: flex; gap: 10px; margin-bottom: 20px; }
+  .btn-save, .btn-cancel {
+    padding: 6px 20px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid; transition: all .2s;
+  }
+  .btn-save { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn-save:hover { background: var(--accent-dim); }
+  .btn-cancel { background: none; border-color: var(--border); color: var(--text-dim); }
+  .btn-cancel:hover { border-color: var(--text-dim); color: var(--text); }
+  .edit-attr-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;
+  }
+  .edit-attr-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px; text-align: center;
+  }
+  .edit-attr-card .ea-label { font-size: 11px; color: var(--text-muted); margin-bottom: 4px; }
+  .edit-attr-card input {
+    width: 100%; text-align: center; background: var(--bg-input); border: 1px solid var(--border);
+    color: #fff; font-size: 24px; font-weight: 700; padding: 4px; border-radius: 6px; outline: none;
+  }
+  .edit-attr-card input:focus { border-color: var(--border-focus); }
+
+  /* Derived Stats Bar */
+  .derived-bar { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
+  .derived-stat {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 14px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 8px; min-width: 100px;
+  }
+  .derived-stat .ds-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+  }
+  .derived-stat .ds-info { display: flex; flex-direction: column; }
+  .derived-stat .ds-label { font-size: 10px; color: var(--text-muted); line-height: 1; }
+  .derived-stat .ds-value { font-size: 16px; font-weight: 600; line-height: 1.2; }
+  .derived-stat .ds-max { font-size: 12px; color: var(--text-dim); font-weight: 400; }
+
+  /* Attribute Grid */
+  .attr-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 24px; }
+  .attr-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: 10px; padding: 12px; text-align: center; transition: border-color .2s;
+  }
+  .attr-card:hover { border-color: var(--accent-dim); }
+  .attr-card .attr-name { font-size: 12px; color: var(--text-dim); margin-bottom: 2px; }
+  .attr-card .attr-value { font-size: 28px; font-weight: 700; color: #fff; line-height: 1.2; }
+  .attr-card .attr-halves {
+    display: flex; justify-content: center; gap: 12px;
+    margin-top: 6px; font-size: 11px; color: var(--text-dim);
+  }
+  .attr-card .attr-halves .half-label { color: var(--text-muted); font-size: 9px; }
+
+  /* Skills - Two Column Table */
+  .skill-filter { display: flex; gap: 6px; margin-bottom: 10px; }
+  .skill-filter button {
+    padding: 3px 12px; border-radius: 12px; border: 1px solid var(--border);
+    background: none; color: var(--text-dim); font-size: 11px; cursor: pointer; transition: all .15s;
+  }
+  .skill-filter button.active { background: rgba(124,111,223,.15); border-color: var(--accent-dim); color: var(--accent); }
+  .skill-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  .skill-col { }
+  .skill-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 6px; border-bottom: 1px solid rgba(42,42,74,.3);
+    font-size: 12px; transition: background .1s;
+  }
+  .skill-row:hover { background: rgba(255,255,255,.015); }
+  .skill-row .sr-growth {
+    width: 14px; height: 14px; border-radius: 3px;
+    border: 1.5px solid var(--border); background: var(--bg-input);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all .15s;
+  }
+  .skill-row .sr-growth.checked { background: var(--accent); border-color: var(--accent); }
+  .skill-row .sr-growth.checked::after { content: '✓'; color: #fff; font-size: 9px; font-weight: 700; }
+  .skill-row .sr-name { flex: 1; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .skill-row .sr-total { font-weight: 600; color: #fff; font-size: 13px; min-width: 28px; text-align: right; }
+  .skill-row .sr-detail { font-size: 10px; color: var(--text-muted); min-width: 60px; text-align: right; }
+  .skill-row.zero { opacity: .35; }
+
+  /* Edit skill table */
+  .edit-skill-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; }
+  .edit-skill-row {
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 6px; border-bottom: 1px solid rgba(42,42,74,.3); font-size: 12px;
+  }
+  .edit-skill-row .esr-name { flex: 1; color: var(--text); font-weight: 500; }
+  .edit-skill-row .esr-base { color: var(--text-muted); font-size: 11px; min-width: 24px; text-align: center; }
+  .edit-skill-row input {
+    width: 40px; text-align: center; background: var(--bg-input); border: 1px solid var(--border);
+    color: var(--text); padding: 2px; border-radius: 4px; font-size: 12px; outline: none;
+  }
+  .edit-skill-row input:focus { border-color: var(--border-focus); }
+
+  /* Weapons Table */
+  .weapon-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .weapon-table th {
+    text-align: left; padding: 6px 8px; color: var(--text-muted); font-weight: 500;
+    font-size: 10px; letter-spacing: .5px; border-bottom: 1px solid var(--border);
+  }
+  .weapon-table td { padding: 6px 8px; border-bottom: 1px solid rgba(42,42,74,.4); }
+  .weapon-name { font-weight: 500; }
+  .weapon-dmg { color: var(--hp-color); font-weight: 600; }
+
+  /* Inventory */
+  .inv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+  .inv-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 12px; background: var(--bg-input); border-radius: 6px; font-size: 12px;
+  }
+  .inv-item .inv-loc {
+    font-size: 10px; color: var(--text-muted); padding: 1px 6px;
+    background: rgba(255,255,255,.04); border-radius: 4px; white-space: nowrap;
+  }
+  .inv-item .inv-name { flex: 1; }
+
+  /* Insanity / Status Effects */
+  .insanity-list { display: flex; flex-direction: column; gap: 10px; }
+  .insanity-card {
+    padding: 12px 16px; background: var(--bg-input);
+    border: 1px solid var(--border); border-radius: 8px;
+    border-left: 3px solid var(--san-color);
+  }
+  .insanity-card .ic-name {
+    font-size: 13px; font-weight: 600; color: var(--san-color); margin-bottom: 4px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .insanity-card .ic-desc { font-size: 12px; color: var(--text-dim); line-height: 1.6; }
+  .insanity-card .ic-remove {
+    margin-left: auto; background: none; border: none; color: var(--text-muted);
+    cursor: pointer; font-size: 14px; padding: 0 4px;
+  }
+  .insanity-card .ic-remove:hover { color: var(--danger); }
+  .insanity-empty {
+    text-align: center; padding: 20px; color: var(--text-muted); font-size: 12px;
+    border: 1px dashed var(--border); border-radius: 8px;
+  }
+  .add-insanity-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 8px; margin-top: 10px;
+    border: 1px dashed var(--border); border-radius: 6px;
+    background: none; color: var(--text-muted); font-size: 12px;
+    cursor: pointer; transition: all .15s;
+  }
+  .add-insanity-btn:hover { border-color: var(--accent-dim); color: var(--accent); }
+
+  /* Background Story */
+  .bg-story {
+    font-size: 13px; color: var(--text-dim); line-height: 1.8;
+    padding: 16px; background: var(--bg-input); border-radius: 8px;
+    border: 1px solid var(--border); white-space: pre-wrap;
+  }
+  .bg-fields {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+    margin-bottom: 16px; font-size: 12px;
+  }
+  .bg-fields .bf-item span { color: var(--text-muted); }
+
+  /* ===== VIEW 2: Board Sticky Notes ===== */
+  .board-demo { display: flex; flex-direction: column; gap: 24px; }
+  .board-context {
+    font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px;
+    border: 1px dashed var(--border); border-radius: 8px;
+  }
+  .board-canvas {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+    padding: 40px 20px;
+    background:
+      radial-gradient(circle at 20% 30%, rgba(124,111,223,.04) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(79,127,207,.04) 0%, transparent 50%),
+      var(--bg-deep);
+    border: 1px solid var(--border); border-radius: 12px; min-height: 400px;
+  }
+  .board-note {
+    width: 210px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+    transition: transform .15s, box-shadow .15s; cursor: default;
+  }
+  .board-note:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+  .bn-header { padding: 10px 12px 8px; border-bottom: 1px solid var(--border); }
+  .bn-name { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 2px; }
+  .bn-occupation { font-size: 11px; color: var(--text-muted); }
+  .bn-derived {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1px;
+    padding: 8px 10px; background: var(--bg-input); margin: 8px 10px; border-radius: 6px;
+  }
+  .bn-derived .bn-stat {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 3px 6px; font-size: 11px;
+  }
+  .bn-derived .bn-label { color: var(--text-muted); font-size: 10px; }
+  .bn-derived .bn-val { font-weight: 600; font-size: 13px; }
+  .bn-attrs {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; padding: 6px 10px 10px;
+  }
+  .bn-attr { text-align: center; padding: 4px 2px; }
+  .bn-attr .ba-label { font-size: 10px; color: var(--text-muted); display: block; }
+  .bn-attr .ba-val { font-size: 14px; font-weight: 600; color: var(--text); }
+  /* Board note: weapons mini */
+  .bn-section { padding: 6px 12px; border-top: 1px solid var(--border); }
+  .bn-section-title { font-size: 9px; color: var(--text-muted); letter-spacing: .5px; margin-bottom: 4px; }
+  .bn-weapon-line {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; padding: 1px 0;
+  }
+  .bn-weapon-line .bnw-name { color: var(--text); }
+  .bn-weapon-line .bnw-dmg { color: var(--hp-color); font-weight: 600; font-size: 10px; }
+  /* Board note: inventory mini */
+  .bn-inv-line { font-size: 10px; color: var(--text-dim); padding: 1px 0; }
+  .bn-inv-line .bni-loc { color: var(--text-muted); }
+  /* Board note: status mini */
+  .bn-status-line {
+    display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 0 2px;
+  }
+  .bn-status-tag {
+    font-size: 9px; padding: 1px 6px; border-radius: 3px;
+    background: rgba(79,127,207,.1); color: var(--san-color);
+  }
+  .bn-status-none { font-size: 10px; color: var(--text-muted); }
+
+  /* ===== VIEW 3: Combat Notes ===== */
+  .combat-context {
+    font-size: 12px; color: var(--text-muted); text-align: center; padding: 8px;
+    border: 1px dashed var(--border); border-radius: 8px;
+  }
+  .combat-area {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+    padding: 40px 20px;
+    background: radial-gradient(circle at 30% 50%, rgba(207,79,79,.03) 0%, transparent 50%), var(--bg-deep);
+    border: 1px solid var(--border); border-radius: 12px; min-height: 400px;
+  }
+  .combat-note {
+    width: 220px; background: var(--bg-card);
+    border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,.3);
+  }
+  .cn-top {
+    padding: 10px 12px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .cn-hp-bar { flex: 1; height: 6px; background: var(--bg-input); border-radius: 3px; overflow: hidden; }
+  .cn-hp-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+  .cn-name { font-size: 13px; font-weight: 600; color: #fff; white-space: nowrap; }
+  .cn-hp-text { font-size: 11px; font-weight: 600; white-space: nowrap; }
+  .cn-combat-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 1px; padding: 8px 10px; background: var(--bg-input);
+  }
+  .cn-cs { text-align: center; padding: 4px 2px; }
+  .cn-cs .cs-label { font-size: 10px; color: var(--text-muted); display: block; }
+  .cn-cs .cs-val { font-size: 14px; font-weight: 600; }
+  /* Combat skills section */
+  .cn-skills { padding: 8px 12px; border-top: 1px solid var(--border); }
+  .cn-skills-title { font-size: 9px; color: var(--text-muted); letter-spacing: .5px; margin-bottom: 6px; }
+  .cn-skill-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 0; font-size: 12px;
+  }
+  .cn-skill-row .cns-name { flex: 1; color: var(--text); font-weight: 500; }
+  .cn-skill-row .cns-rate { font-weight: 600; color: var(--accent); font-size: 13px; min-width: 32px; text-align: right; }
+  /* Combat weapons section */
+  .cn-weapons { padding: 8px 12px; border-top: 1px solid var(--border); }
+  .cn-weapons .cnw-title { font-size: 9px; color: var(--text-muted); letter-spacing: .5px; margin-bottom: 6px; }
+  .cn-weapon-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 3px 0; font-size: 12px;
+  }
+  .cn-weapon-row .cnw-name { flex: 1; color: var(--text); }
+  .cn-weapon-row .cnw-dmg { color: var(--hp-color); font-weight: 600; font-size: 11px; }
+  /* Combat status (insanity) */
+  .cn-status {
+    padding: 6px 12px; border-top: 1px solid var(--border);
+    display: flex; gap: 6px; flex-wrap: wrap;
+  }
+  .cn-status-tag {
+    font-size: 10px; padding: 2px 8px; border-radius: 4px;
+    background: rgba(79,127,207,.1); color: var(--san-color); font-weight: 500;
+  }
+  .cn-status-ok {
+    font-size: 10px; padding: 2px 8px; border-radius: 4px;
+    background: rgba(79,207,127,.1); color: var(--success);
+  }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 700px) {
+    .attr-grid { grid-template-columns: repeat(2, 1fr); }
+    .char-header { flex-direction: column; }
+    .derived-bar { flex-direction: column; }
+    .skill-columns, .edit-skill-columns { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Top Bar -->
+<div class="topbar">
+  <h1>COC 7th · 角色系统原型</h1>
+  <div class="sep"></div>
+  <div class="view-tabs">
+    <button class="view-tab active" onclick="switchView('album')">角色图鉴</button>
+    <button class="view-tab" onclick="switchView('board')">带团板便签</button>
+    <button class="view-tab" onclick="switchView('combat')">战斗便签</button>
+  </div>
+  <div class="topbar-right">
+    <button class="edit-toggle" id="editToggle" onclick="toggleEdit()">编辑模式</button>
+    <span class="char-label">示例角色</span>
+    <select id="charSelect" onchange="render()">
+      <option value="sebastian">塞巴斯蒂安·索恩</option>
+    </select>
+  </div>
+</div>
+
+<!-- VIEW 1: Character Album -->
+<div class="view active" id="view-album">
+  <div id="albumContent"></div>
+</div>
+
+<!-- VIEW 2: Board Notes -->
+<div class="view" id="view-board">
+  <div class="board-demo">
+    <div class="board-context">带团板画布上的角色便签 — 紧凑信息卡，快速扫视角色状态（锁定/删除/双击进入图鉴等原有交互保留）</div>
+    <div class="board-canvas" id="boardCanvas"></div>
+  </div>
+</div>
+
+<!-- VIEW 3: Combat Notes -->
+<div class="view" id="view-combat">
+  <div class="combat-context">战斗模块中的角色便签 — 聚焦战斗信息：HP条、战斗属性、战斗技能、武器伤害、疯狂状态（锁定/删除等原有交互保留）</div>
+  <div class="combat-area" id="combatArea"></div>
+</div>
+
+<script>
+// ===== DB Calculation =====
+function calcDB(str, siz) {
+  const total = str + siz;
+  if (total <= 64) return { db: '-2', build: -2 };
+  if (total <= 84) return { db: '-1', build: -1 };
+  if (total <= 124) return { db: '0', build: 0 };
+  if (total <= 164) return { db: '+1D4', build: 1 };
+  if (total <= 204) return { db: '+1D6', build: 2 };
+  if (total <= 284) return { db: '+2D6', build: 3 };
+  if (total <= 364) return { db: '+3D6', build: 4 };
+  return { db: '+4D6', build: 5 };
+}
+
+// ===== COC Character Data =====
+const COC_CHARACTERS = {
+  sebastian: {
+    name: '塞巴斯蒂安·索恩',
+    player: '沉云',
+    occupation: '法医',
+    age: 45,
+    gender: '男',
+    era: '1890年',
+    residence: '伦敦',
+    birthplace: '爱丁堡',
+
+    attributes: {
+      str: { name: '力量', value: 40 },
+      con: { name: '体质', value: 50 },
+      siz: { name: '体型', value: 60 },
+      dex: { name: '敏捷', value: 65 },
+      app: { name: '外貌', value: 60 },
+      int: { name: '智力', value: 60 },
+      pow: { name: '意志', value: 85 },
+      edu: { name: '教育', value: 70 }
+    },
+
+    hp:  { current: 11, max: 11 },
+    san: { current: 85, max: 99 },
+    luck: { current: 40, max: 99 },
+    mp:  { current: 17, max: 17 },
+    armor: 0,
+    mov: 7,
+
+    skills: [
+      { name: '会计', base: 5, occ: 0, int: 0, growth: false },
+      { name: '人类学', base: 1, occ: 0, int: 0, growth: false },
+      { name: '估价', base: 5, occ: 0, int: 0, growth: false },
+      { name: '考古学', base: 1, occ: 0, int: 0, growth: false },
+      { name: '技艺①', base: 5, occ: 0, int: 0, growth: false },
+      { name: '技艺②', base: 5, occ: 0, int: 0, growth: false },
+      { name: '技艺③', base: 5, occ: 0, int: 0, growth: false },
+      { name: '魅惑', base: 15, occ: 0, int: 0, growth: false },
+      { name: '攀爬', base: 20, occ: 0, int: 0, growth: false },
+      { name: '计算机使用', base: 5, occ: 0, int: 0, growth: false },
+      { name: '信用评级', base: 0, occ: 50, int: 0, growth: false },
+      { name: '克苏鲁神话', base: 0, occ: 0, int: 0, growth: false },
+      { name: '乔装', base: 5, occ: 0, int: 0, growth: false },
+      { name: '闪避', base: 32, occ: 0, int: 0, growth: false },
+      { name: '汽车驾驶', base: 20, occ: 0, int: 0, growth: false },
+      { name: '电气维修', base: 10, occ: 0, int: 0, growth: false },
+      { name: '电子学', base: 1, occ: 0, int: 0, growth: false },
+      { name: '话术', base: 5, occ: 0, int: 0, growth: false },
+      { name: '格斗(斗殴)', base: 25, occ: 0, int: 0, growth: false },
+      { name: '格斗①', base: 0, occ: 0, int: 0, growth: false },
+      { name: '格斗②', base: 0, occ: 0, int: 0, growth: false },
+      { name: '射击(手枪)', base: 20, occ: 0, int: 0, growth: false },
+      { name: '射击①', base: 0, occ: 0, int: 0, growth: false },
+      { name: '射击②', base: 0, occ: 0, int: 0, growth: false },
+      { name: '急救', base: 30, occ: 0, int: 40, growth: false },
+      { name: '历史', base: 5, occ: 0, int: 30, growth: false },
+      { name: '恐吓', base: 15, occ: 0, int: 0, growth: false },
+      { name: '跳跃', base: 20, occ: 0, int: 0, growth: false },
+      { name: '外语(拉丁文)', base: 1, occ: 0, int: 0, growth: false },
+      { name: '外语②', base: 1, occ: 0, int: 0, growth: false },
+      { name: '母语(中文)', base: 70, occ: 0, int: 0, growth: false },
+      { name: '法律', base: 5, occ: 0, int: 0, growth: false },
+      { name: '图书馆使用', base: 20, occ: 0, int: 20, growth: false },
+      { name: '聆听', base: 20, occ: 0, int: 10, growth: false },
+      { name: '锁匠', base: 1, occ: 0, int: 0, growth: false },
+      { name: '机械维修', base: 10, occ: 0, int: 5, growth: false },
+      { name: '医学', base: 1, occ: 0, int: 80, growth: false },
+      { name: '博物学', base: 10, occ: 0, int: 5, growth: false },
+      { name: '领航', base: 10, occ: 0, int: 5, growth: false },
+      { name: '神秘学', base: 5, occ: 0, int: 2, growth: false },
+      { name: '操作重型机械', base: 1, occ: 0, int: 0, growth: false },
+      { name: '说服', base: 10, occ: 0, int: 5, growth: false },
+      { name: '精神分析', base: 1, occ: 0, int: 0, growth: false },
+      { name: '心理学', base: 10, occ: 0, int: 5, growth: false },
+      { name: '骑术', base: 5, occ: 0, int: 0, growth: false },
+      { name: '科学(生物学)', base: 1, occ: 0, int: 50, growth: false },
+      { name: '科学(鉴证)', base: 1, occ: 0, int: 30, growth: false },
+      { name: '科学(制药)', base: 1, occ: 0, int: 50, growth: false },
+      { name: '妙手', base: 10, occ: 0, int: 5, growth: false },
+      { name: '侦查', base: 25, occ: 0, int: 20, growth: false },
+      { name: '潜行', base: 20, occ: 0, int: 10, growth: false },
+      { name: '生存', base: 10, occ: 0, int: 5, growth: false },
+      { name: '游泳', base: 20, occ: 0, int: 0, growth: false },
+      { name: '投掷', base: 20, occ: 0, int: 0, growth: false },
+      { name: '追踪', base: 10, occ: 0, int: 40, growth: false },
+      { name: '驯兽', base: 5, occ: 0, int: 0, growth: false },
+      { name: '潜水', base: 1, occ: 0, int: 0, growth: false },
+      { name: '爆破', base: 1, occ: 0, int: 0, growth: false },
+      { name: '读唇', base: 1, occ: 0, int: 0, growth: false },
+      { name: '催眠', base: 1, occ: 0, int: 0, growth: false },
+      { name: '炮术', base: 1, occ: 0, int: 0, growth: false }
+    ],
+
+    weapons: [
+      { name: '无(斗殴)', type: '肉搏', skill: '斗殴', rate: 25, damage: '1D3+DB', range: '接触', ap: false, ammo: '-' },
+      { name: '弹簧折叠刀', type: '肉搏', skill: '斗殴', rate: 25, damage: '1D4+DB', range: '接触', ap: true, ammo: '-' }
+    ],
+
+    inventory: [
+      { name: '弹簧刀（防身用）', location: '裤兜' },
+      { name: '笔记', location: '衣服内' },
+      { name: '红色围脖', location: '贵重之物' },
+      { name: '线索墙照片', location: '随身' }
+    ],
+
+    insanityEffects: [
+      { name: '人群恐惧症', desc: '在拥挤的人群中会触发恐慌发作，表现为呼吸急促、视线模糊，被迫进行意志检定以保持理智。' },
+      { name: '偏执妄想', desc: '对"开膛手杰克"的执念延伸至所有连环杀手案件，无法克制地研究每一起相关案件细节。' }
+    ],
+
+    backstory: `塞巴斯蒂安·索恩出身于一个日渐没落的中产阶级知识分子家庭。
+凭借其敏锐的头脑和冷静的性格，18岁成功考入爱丁堡大学，并迅速专注于当时新兴的法医病理学领域。
+24岁开始，以法医身份服务于伦敦警察厅。
+
+一帆风顺的法医生涯，在1888年走到了尽头...
+"开膛手"杰克所残害的数位女性尸体被送往伦敦警察厅，索恩作为主刀，和几位助手一同尸检取证。他们确认了凶器是刀具，确认了挥刀的动作。除此之外，这位专业的凶手没有留下任何线索。
+
+社会舆论爆发，全城陷入恐慌之中，终日在女尸旁尸检的索恩熬出了白发，也没有半点新发现。
+警长不甘地给索恩递来了辞职信，索恩明白只有这样做才能缓解民愤。
+
+独守豪宅空房的索恩整天在自制的一片线索墙思索。
+固执的他恨"开膛手"杰克让他的世界停滞了，另一方面，他又爱"开膛手"杰克，因为他让索恩知道自己对法医学的钻研还有很长的路要走。
+
+1890年的新年伊始，伦敦警察厅突然高调宣布终止调查，在这之后，"开膛手杰克"也确实没有再出现过。
+真相被警察厅和高层掩藏了起来，索恩释怀了，才发现这两年的执着研究，并非是因为真相没有被揭开，而是因为他不愿相信一个杀人犯能在社会中全身而退。
+
+1890年，45岁的他拿着宽裕的资金和雄厚的人脉开办了一家私家侦探事务所...`,
+
+    ideas: '唯物主义、智性恋',
+    importantPeople: '逝去的父母',
+    meaningfulPlace: '伦敦警察厅',
+    treasuredItem: '二十年前，初恋送给他的红色围脖',
+    trait: 'INTJ，博学多闻，待人冷漠',
+    fear: '人群恐惧症'
+  }
+};
+
+// ===== State =====
+let editMode = false;
+let currentView = 'album';
+
+// ===== View Switching =====
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('view-' + view).classList.add('active');
+  document.querySelectorAll('.view-tab').forEach(t => {
+    if (t.textContent.includes(view === 'album' ? '图鉴' : view === 'board' ? '带团板' : '战斗'))
+      t.classList.add('active');
+  });
+  // Show edit toggle only in album view
+  document.getElementById('editToggle').style.display = view === 'album' ? '' : 'none';
+  render();
+}
+
+function toggleEdit() {
+  editMode = !editMode;
+  const btn = document.getElementById('editToggle');
+  btn.classList.toggle('active', editMode);
+  btn.textContent = editMode ? '退出编辑' : '编辑模式';
+  render();
+}
+
+function getChar() {
+  return COC_CHARACTERS[document.getElementById('charSelect').value];
+}
+
+function render() {
+  const c = getChar();
+  renderAlbum(c);
+  renderBoard(c);
+  renderCombat(c);
+}
+
+// ===== Helper: get DB for character =====
+function getCharDB(c) {
+  return calcDB(c.attributes.str.value, c.attributes.siz.value);
+}
+
+// ===== Helper: extract combat skills =====
+function getCombatSkills(c) {
+  const result = [];
+  c.skills.forEach(sk => {
+    const total = sk.base + sk.occ + sk.int;
+    if (total <= 0) return;
+    const name = sk.name;
+    if (name === '闪避' || name.startsWith('格斗(') || name.startsWith('射击(')) {
+      result.push({ name, total });
+    }
+  });
+  return result;
+}
+
+// ===== Helper: derived card =====
+function derivedCard(label, current, max, color, fullName) {
+  return `<div class="derived-stat">
+    <div class="ds-icon" style="background:${color};">${label}</div>
+    <div class="ds-info">
+      <span class="ds-label">${fullName}</span>
+      <span class="ds-value" style="color:${color}">${current}<span class="ds-max">/${max}</span></span>
+    </div>
+  </div>`;
+}
+
+// ===== VIEW 1: Character Album =====
+function renderAlbum(c) {
+  const el = document.getElementById('albumContent');
+  if (editMode) {
+    renderAlbumEdit(c, el);
+  } else {
+    renderAlbumView(c, el);
+  }
+}
+
+function renderAlbumView(c, el) {
+  const attrs = c.attributes;
+  const dbInfo = getCharDB(c);
+
+  let html = '';
+
+  // Header
+  html += `<div class="char-header">
+    <div class="char-portrait">👤</div>
+    <div class="char-info">
+      <div class="char-name-row">
+        <span class="char-name">${c.name}</span>
+        <span class="char-occupation">${c.occupation}</span>
+      </div>
+      <div class="char-meta">
+        <span><span class="label">玩家</span> ${c.player}</span>
+        <span><span class="label">年龄</span> ${c.age}</span>
+        <span><span class="label">性别</span> ${c.gender}</span>
+        <span><span class="label">时代</span> ${c.era}</span>
+        <span><span class="label">住地</span> ${c.residence}</span>
+        <span><span class="label">故乡</span> ${c.birthplace}</span>
+      </div>
+    </div>
+  </div>`;
+
+  // Derived stats bar (HP, SAN, LUCK, MP, ARM, MOV, DB)
+  html += `<div class="derived-bar">`;
+  html += derivedCard('HP', c.hp.current, c.hp.max, 'var(--hp-color)', '体力');
+  html += derivedCard('SAN', c.san.current, c.san.max, 'var(--san-color)', '理智');
+  html += derivedCard('LUCK', c.luck.current, c.luck.max, 'var(--luck-color)', '幸运');
+  html += derivedCard('MP', c.mp.current, c.mp.max, 'var(--mp-color)', '魔法');
+  html += `<div class="derived-stat">
+    <div class="ds-icon" style="background:var(--bg-input);color:var(--text-dim);font-size:10px;">护甲</div>
+    <div class="ds-info"><span class="ds-label">护甲</span><span class="ds-value">${c.armor}</span></div>
+  </div>`;
+  html += `<div class="derived-stat">
+    <div class="ds-icon" style="background:var(--bg-input);color:var(--text-dim);font-size:10px;">移动</div>
+    <div class="ds-info"><span class="ds-label">移动力</span><span class="ds-value">${c.mov}</span></div>
+  </div>`;
+  html += `<div class="derived-stat">
+    <div class="ds-icon" style="background:var(--hp-color);color:#fff;font-size:10px;">伤害</div>
+    <div class="ds-info"><span class="ds-label">伤害加值</span><span class="ds-value" style="color:var(--hp-color)">${dbInfo.db}</span></div>
+  </div>`;
+  html += `</div>`;
+
+  // Attributes
+  html += `<div class="section-title">基础属性</div>`;
+  html += `<div class="attr-grid">`;
+  for (const [key, attr] of Object.entries(attrs)) {
+    const half = Math.floor(attr.value / 2);
+    const fifth = Math.floor(attr.value / 5);
+    html += `<div class="attr-card">
+      <div class="attr-name">${attr.name}</div>
+      <div class="attr-value">${attr.value}</div>
+      <div class="attr-halves">
+        <div><span class="half-label">半值</span> ${half}</div>
+        <div><span class="half-label">极小</span> ${fifth}</div>
+      </div>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Skills — two columns
+  const totalSkills = c.skills.length;
+  const investedSkills = c.skills.filter(s => s.occ > 0 || s.int > 0).length;
+  const halfCount = Math.ceil(c.skills.length / 2);
+  const col1 = c.skills.slice(0, halfCount);
+  const col2 = c.skills.slice(halfCount);
+
+  html += `<div class="collapsible open" id="skillSection">
+    <div class="collapsible-header" onclick="toggleCollapsible('skillSection')">
+      <div class="ch-icon">⚔</div>
+      <span class="ch-title">技能表</span>
+      <span class="ch-badge">${investedSkills} 项已分配 / ${totalSkills} 项</span>
+      <span class="ch-arrow">▶</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="skill-filter">
+        <button class="active" onclick="filterSkills('all', this)">全部</button>
+        <button onclick="filterSkills('invested', this)">已分配</button>
+        <button onclick="filterSkills('nonzero', this)">有成功率</button>
+      </div>
+      <div class="skill-columns" id="skillColumns">
+        <div class="skill-col" id="skillCol1">`;
+  col1.forEach(sk => {
+    const total = sk.base + sk.occ + sk.int;
+    const isInvested = sk.occ > 0 || sk.int > 0;
+    const zeroClass = total > 0 ? '' : ' zero';
+    const filterTag = `${isInvested ? 'invested' : ''} ${total > 0 ? 'nonzero' : ''}`;
+    html += `<div class="skill-row${zeroClass}" data-filter="${filterTag}">
+      <div class="sr-growth ${sk.growth ? 'checked' : ''}" onclick="this.classList.toggle('checked')"></div>
+      <span class="sr-name" title="${sk.name}">${sk.name}</span>
+      <span class="sr-total">${total}</span>
+      <span class="sr-detail">${sk.base}+${sk.occ || 0}+${sk.int || 0}</span>
+    </div>`;
+  });
+  html += `</div><div class="skill-col" id="skillCol2">`;
+  col2.forEach(sk => {
+    const total = sk.base + sk.occ + sk.int;
+    const isInvested = sk.occ > 0 || sk.int > 0;
+    const zeroClass = total > 0 ? '' : ' zero';
+    const filterTag = `${isInvested ? 'invested' : ''} ${total > 0 ? 'nonzero' : ''}`;
+    html += `<div class="skill-row${zeroClass}" data-filter="${filterTag}">
+      <div class="sr-growth ${sk.growth ? 'checked' : ''}" onclick="this.classList.toggle('checked')"></div>
+      <span class="sr-name" title="${sk.name}">${sk.name}</span>
+      <span class="sr-total">${total}</span>
+      <span class="sr-detail">${sk.base}+${sk.occ || 0}+${sk.int || 0}</span>
+    </div>`;
+  });
+  html += `</div></div></div></div>`;
+
+  // Weapons
+  html += `<div class="collapsible open" id="weaponSection">
+    <div class="collapsible-header" onclick="toggleCollapsible('weaponSection')">
+      <div class="ch-icon">🗡</div>
+      <span class="ch-title">武器栏</span>
+      <span class="ch-badge">${c.weapons.length} 件</span>
+      <span class="ch-arrow">▶</span>
+    </div>
+    <div class="collapsible-body">
+      <table class="weapon-table">
+        <thead><tr>
+          <th>武器名称</th><th>类型</th><th>技能</th><th>成功率</th><th>伤害</th><th>射程</th><th>穿刺</th>
+        </tr></thead><tbody>`;
+  c.weapons.forEach(w => {
+    html += `<tr>
+      <td class="weapon-name">${w.name}</td>
+      <td>${w.type}</td><td>${w.skill}</td><td>${w.rate}</td>
+      <td class="weapon-dmg">${w.damage}</td>
+      <td>${w.range}</td><td>${w.ap ? '✓' : ''}</td>
+    </tr>`;
+  });
+  html += `</tbody></table></div></div>`;
+
+  // Inventory
+  html += `<div class="collapsible" id="invSection">
+    <div class="collapsible-header" onclick="toggleCollapsible('invSection')">
+      <div class="ch-icon">🎒</div>
+      <span class="ch-title">背包栏</span>
+      <span class="ch-badge">${c.inventory.length} 件</span>
+      <span class="ch-arrow">▶</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="inv-grid">`;
+  c.inventory.forEach(item => {
+    html += `<div class="inv-item">
+      <span class="inv-loc">${item.location}</span>
+      <span class="inv-name">${item.name}</span>
+    </div>`;
+  });
+  html += `</div></div></div>`;
+
+  // Status — Insanity Effects
+  const insanityCount = c.insanityEffects.length;
+  html += `<div class="collapsible open" id="statusSection">
+    <div class="collapsible-header" onclick="toggleCollapsible('statusSection')">
+      <div class="ch-icon">🧠</div>
+      <span class="ch-title">疯狂 / 状态栏</span>
+      <span class="ch-badge">${insanityCount > 0 ? insanityCount + ' 项效果' : '无'}</span>
+      <span class="ch-arrow">▶</span>
+    </div>
+    <div class="collapsible-body">`;
+  if (insanityCount === 0) {
+    html += `<div class="insanity-empty">暂无疯狂效果</div>`;
+  } else {
+    html += `<div class="insanity-list">`;
+    c.insanityEffects.forEach((eff, i) => {
+      html += `<div class="insanity-card">
+        <div class="ic-name">
+          ${eff.name}
+          <button class="ic-remove" title="移除" onclick="this.closest('.insanity-card').remove()">×</button>
+        </div>
+        <div class="ic-desc">${eff.desc}</div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+  html += `<button class="add-insanity-btn" onclick="addInsanity()">+ 添加疯狂效果</button>`;
+  html += `</div></div>`;
+
+  // Background Story
+  html += `<div class="collapsible" id="bgSection">
+    <div class="collapsible-header" onclick="toggleCollapsible('bgSection')">
+      <div class="ch-icon">📜</div>
+      <span class="ch-title">背景故事</span>
+      <span class="ch-arrow">▶</span>
+    </div>
+    <div class="collapsible-body">
+      <div class="bg-fields">
+        <div class="bf-item"><span>思想与信念：</span>${c.ideas}</div>
+        <div class="bf-item"><span>重要之人：</span>${c.importantPeople}</div>
+        <div class="bf-item"><span>意义非凡之地：</span>${c.meaningfulPlace}</div>
+        <div class="bf-item"><span>宝贵之物：</span>${c.treasuredItem}</div>
+        <div class="bf-item"><span>特质：</span>${c.trait}</div>
+        <div class="bf-item"><span>恐惧症：</span>${c.fear}</div>
+      </div>
+      <div class="bg-story">${c.backstory}</div>
+    </div></div>`;
+
+  el.innerHTML = html;
+}
+
+// ===== Album Edit Mode =====
+function renderAlbumEdit(c, el) {
+  const attrs = c.attributes;
+  const dbInfo = getCharDB(c);
+
+  let html = '';
+
+  // Edit actions
+  html += `<div class="edit-actions">
+    <button class="btn-save" onclick="saveEdit()">保存</button>
+    <button class="btn-cancel" onclick="toggleEdit()">取消</button>
+  </div>`;
+
+  // Character info form
+  html += `<div class="edit-form">
+    <div class="section-title">基本信息</div>
+    <div class="edit-row">
+      <div class="edit-field"><label>姓名</label><input id="editName" value="${c.name}"></div>
+      <div class="edit-field"><label>职业</label><input id="editOccupation" value="${c.occupation}"></div>
+      <div class="edit-field"><label>玩家</label><input id="editPlayer" value="${c.player}"></div>
+      <div class="edit-field"><label>年龄</label><input id="editAge" type="number" value="${c.age}"></div>
+      <div class="edit-field"><label>性别</label><input id="editGender" value="${c.gender}"></div>
+      <div class="edit-field"><label>时代</label><input id="editEra" value="${c.era}"></div>
+      <div class="edit-field"><label>住地</label><input id="editResidence" value="${c.residence}"></div>
+      <div class="edit-field"><label>故乡</label><input id="editBirthplace" value="${c.birthplace}"></div>
+    </div>
+  </div>`;
+
+  // Derived stats edit
+  html += `<div class="edit-form">
+    <div class="section-title">派生数值</div>
+    <div class="edit-row">
+      <div class="edit-field"><label>体力 (当前/最大)</label>
+        <div style="display:flex;gap:4px;"><input id="editHpCur" type="number" value="${c.hp.current}" style="width:60px;"><span style="color:var(--text-muted);line-height:30px;">/</span><input id="editHpMax" type="number" value="${c.hp.max}" style="width:60px;"></div>
+      </div>
+      <div class="edit-field"><label>理智 (当前/最大)</label>
+        <div style="display:flex;gap:4px;"><input id="editSanCur" type="number" value="${c.san.current}" style="width:60px;"><span style="color:var(--text-muted);line-height:30px;">/</span><input id="editSanMax" type="number" value="${c.san.max}" style="width:60px;"></div>
+      </div>
+      <div class="edit-field"><label>幸运 (当前/最大)</label>
+        <div style="display:flex;gap:4px;"><input id="editLuckCur" type="number" value="${c.luck.current}" style="width:60px;"><span style="color:var(--text-muted);line-height:30px;">/</span><input id="editLuckMax" type="number" value="${c.luck.max}" style="width:60px;"></div>
+      </div>
+      <div class="edit-field"><label>魔法 (当前/最大)</label>
+        <div style="display:flex;gap:4px;"><input id="editMpCur" type="number" value="${c.mp.current}" style="width:60px;"><span style="color:var(--text-muted);line-height:30px;">/</span><input id="editMpMax" type="number" value="${c.mp.max}" style="width:60px;"></div>
+      </div>
+      <div class="edit-field"><label>护甲</label><input id="editArmor" type="number" value="${c.armor}"></div>
+      <div class="edit-field"><label>移动力</label><input id="editMov" type="number" value="${c.mov}"></div>
+      <div class="edit-field"><label>伤害加值 (自动计算)</label><input value="${dbInfo.db}" disabled style="opacity:.6;"></div>
+    </div>
+  </div>`;
+
+  // Attributes edit
+  html += `<div class="edit-form">
+    <div class="section-title">基础属性</div>
+    <div class="edit-attr-grid">`;
+  for (const [key, attr] of Object.entries(attrs)) {
+    html += `<div class="edit-attr-card">
+      <div class="ea-label">${attr.name} (${key.toUpperCase()})</div>
+      <input id="editAttr_${key}" type="number" value="${attr.value}">
+    </div>`;
+  }
+  html += `</div></div>`;
+
+  // Skills edit — two columns with OCC/INT inputs
+  const halfCount = Math.ceil(c.skills.length / 2);
+  const col1 = c.skills.slice(0, halfCount);
+  const col2 = c.skills.slice(halfCount);
+
+  html += `<div class="edit-form">
+    <div class="section-title">技能分配</div>
+    <div class="edit-skill-columns">
+      <div class="skill-col">`;
+  col1.forEach((sk, i) => {
+    const total = sk.base + sk.occ + sk.int;
+    html += `<div class="edit-skill-row">
+      <span class="esr-name">${sk.name}</span>
+      <span class="esr-base">${sk.base}</span>
+      <input type="number" min="0" value="${sk.occ}" title="职业点" data-skill="${i}" data-type="occ" style="border-color:var(--accent-dim);">
+      <input type="number" min="0" value="${sk.int}" title="兴趣点" data-skill="${i}" data-type="int" style="border-color:var(--luck-color);">
+      <span style="font-weight:600;color:#fff;min-width:28px;text-align:right;font-size:13px;">${total}</span>
+    </div>`;
+  });
+  html += `</div><div class="skill-col">`;
+  col2.forEach((sk, i) => {
+    const realIdx = halfCount + i;
+    const total = sk.base + sk.occ + sk.int;
+    html += `<div class="edit-skill-row">
+      <span class="esr-name">${sk.name}</span>
+      <span class="esr-base">${sk.base}</span>
+      <input type="number" min="0" value="${sk.occ}" title="职业点" data-skill="${realIdx}" data-type="occ" style="border-color:var(--accent-dim);">
+      <input type="number" min="0" value="${sk.int}" title="兴趣点" data-skill="${realIdx}" data-type="int" style="border-color:var(--luck-color);">
+      <span style="font-weight:600;color:#fff;min-width:28px;text-align:right;font-size:13px;">${total}</span>
+    </div>`;
+  });
+  html += `</div></div></div>`;
+
+  // Insanity effects edit
+  html += `<div class="edit-form">
+    <div class="section-title">疯狂效果</div>`;
+  c.insanityEffects.forEach((eff, i) => {
+    html += `<div style="display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;">
+      <div style="flex:1;">
+        <input type="text" value="${eff.name}" placeholder="疯狂名称" style="width:100%;margin-bottom:4px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;">
+        <textarea placeholder="效果描述" rows="2" style="width:100%;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;resize:vertical;">${eff.desc}</textarea>
+      </div>
+      <button onclick="this.closest('div[style]').remove()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:4px;">×</button>
+    </div>`;
+  });
+  html += `<button class="add-insanity-btn" onclick="addEditInsanity()">+ 添加疯狂效果</button>`;
+  html += `</div>`;
+
+  el.innerHTML = html;
+}
+
+function addInsanity() {
+  const c = getChar();
+  c.insanityEffects.push({ name: '新疯狂效果', desc: '描述此疯狂效果的表现和触发条件。' });
+  renderAlbumView(c, document.getElementById('albumContent'));
+}
+
+function addEditInsanity() {
+  const container = event.target.closest('.edit-form');
+  const btn = event.target;
+  const div = document.createElement('div');
+  div.style.cssText = 'display:flex;gap:8px;margin-bottom:8px;align-items:flex-start;';
+  div.innerHTML = `<div style="flex:1;">
+    <input type="text" placeholder="疯狂名称" style="width:100%;margin-bottom:4px;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:13px;">
+    <textarea placeholder="效果描述" rows="2" style="width:100%;background:var(--bg-input);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;resize:vertical;"></textarea>
+  </div>
+  <button onclick="this.closest('div[style]').remove()" style="border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:18px;padding:4px;">×</button>`;
+  container.insertBefore(div, btn);
+}
+
+function saveEdit() {
+  // Prototype: just toggle back to view mode
+  alert('原型演示：保存功能将在实际实现时完成');
+  toggleEdit();
+}
+
+function toggleCollapsible(id) {
+  document.getElementById(id).classList.toggle('open');
+}
+
+function filterSkills(filter, btn) {
+  document.querySelectorAll('.skill-filter button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('#skillColumns .skill-row').forEach(tr => {
+    const tags = tr.dataset.filter || '';
+    if (filter === 'all') { tr.style.display = ''; }
+    else if (filter === 'invested') { tr.style.display = tags.includes('invested') ? '' : 'none'; }
+    else if (filter === 'nonzero') { tr.style.display = tags.includes('nonzero') ? '' : 'none'; }
+  });
+}
+
+// ===== VIEW 2: Board Notes =====
+function renderBoard(c) {
+  const el = document.getElementById('boardCanvas');
+  const attrs = c.attributes;
+  const dbInfo = getCharDB(c);
+
+  let html = '';
+
+  // Main character board note
+  html += `<div class="board-note">
+    <div class="bn-header">
+      <div class="bn-name">${c.name}</div>
+      <div class="bn-occupation">${c.occupation} · ${c.age}岁</div>
+    </div>
+    <div class="bn-derived">
+      <div class="bn-stat"><span class="bn-label" style="color:var(--hp-color)">体力</span><span class="bn-val" style="color:var(--hp-color)">${c.hp.current}/${c.hp.max}</span></div>
+      <div class="bn-stat"><span class="bn-label" style="color:var(--san-color)">理智</span><span class="bn-val" style="color:var(--san-color)">${c.san.current}/${c.san.max}</span></div>
+      <div class="bn-stat"><span class="bn-label" style="color:var(--luck-color)">幸运</span><span class="bn-val" style="color:var(--luck-color)">${c.luck.current}</span></div>
+      <div class="bn-stat"><span class="bn-label" style="color:var(--mp-color)">魔法</span><span class="bn-val" style="color:var(--mp-color)">${c.mp.current}/${c.mp.max}</span></div>
+    </div>
+    <div class="bn-attrs">`;
+  for (const [key, attr] of Object.entries(attrs)) {
+    html += `<div class="bn-attr">
+      <span class="ba-label">${attr.name}</span>
+      <span class="ba-val">${attr.value}</span>
+    </div>`;
+  }
+  html += `</div>`;
+
+  // Weapons mini
+  html += `<div class="bn-section">
+    <div class="bn-section-title">武器</div>`;
+  c.weapons.forEach(w => {
+    html += `<div class="bn-weapon-line">
+      <span class="bnw-name">${w.name}</span>
+      <span class="bnw-dmg">${w.damage}</span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Inventory mini
+  html += `<div class="bn-section">
+    <div class="bn-section-title">物品</div>`;
+  c.inventory.forEach(item => {
+    html += `<div class="bn-inv-line"><span class="bni-loc">${item.location}</span> ${item.name}</div>`;
+  });
+  html += `</div>`;
+
+  // Status mini (insanity effects)
+  html += `<div class="bn-section">
+    <div class="bn-section-title">状态</div>`;
+  if (c.insanityEffects.length > 0) {
+    html += `<div class="bn-status-line">`;
+    c.insanityEffects.forEach(eff => {
+      html += `<span class="bn-status-tag">${eff.name}</span>`;
+    });
+    html += `</div>`;
+  } else {
+    html += `<span class="bn-status-none">正常</span>`;
+  }
+  html += `</div>`;
+
+  html += `</div>`; // close board-note
+
+  // NPC examples
+  const npcs = [
+    {
+      name: '不明身份男子', occupation: '嫌疑人',
+      hp: { current: 8, max: 10 }, san: { current: 55, max: 70 }, luck: 30, mp: { current: 9, max: 9 },
+      attrs: { str: { name: '力量', value: 55 }, con: { name: '体质', value: 60 }, siz: { name: '体型', value: 65 }, dex: { name: '敏捷', value: 50 }, app: { name: '外貌', value: 40 }, int: { name: '智力', value: 50 }, pow: { name: '意志', value: 60 }, edu: { name: '教育', value: 45 } },
+      weapons: [{ name: '拳头', damage: '1D3' }, { name: '短刀', damage: '1D4+1' }],
+      inventory: [{ name: '可疑信件', location: '内袋' }, { name: '钥匙', location: '裤兜' }],
+      insanityEffects: []
+    },
+    {
+      name: 'Mary Watson', occupation: '护士',
+      hp: { current: 12, max: 12 }, san: { current: 90, max: 95 }, luck: 55, mp: { current: 14, max: 14 },
+      attrs: { str: { name: '力量', value: 35 }, con: { name: '体质', value: 45 }, siz: { name: '体型', value: 50 }, dex: { name: '敏捷', value: 70 }, app: { name: '外貌', value: 75 }, int: { name: '智力', value: 65 }, pow: { name: '意志', value: 70 }, edu: { name: '教育', value: 60 } },
+      weapons: [{ name: '手术刀', damage: '1D4' }],
+      inventory: [{ name: '医疗包', location: '手提包' }, { name: '手术工具', location: '手提包' }],
+      insanityEffects: [{ name: '洁癖强迫', desc: '' }]
+    }
+  ];
+
+  npcs.forEach(npc => {
+    html += `<div class="board-note">
+      <div class="bn-header">
+        <div class="bn-name">${npc.name}</div>
+        <div class="bn-occupation">${npc.occupation}</div>
+      </div>
+      <div class="bn-derived">
+        <div class="bn-stat"><span class="bn-label" style="color:var(--hp-color)">体力</span><span class="bn-val" style="color:var(--hp-color)">${npc.hp.current}/${npc.hp.max}</span></div>
+        <div class="bn-stat"><span class="bn-label" style="color:var(--san-color)">理智</span><span class="bn-val" style="color:var(--san-color)">${npc.san.current}/${npc.san.max}</span></div>
+        <div class="bn-stat"><span class="bn-label" style="color:var(--luck-color)">幸运</span><span class="bn-val" style="color:var(--luck-color)">${npc.luck}</span></div>
+        <div class="bn-stat"><span class="bn-label" style="color:var(--mp-color)">魔法</span><span class="bn-val" style="color:var(--mp-color)">${npc.mp.current}/${npc.mp.max}</span></div>
+      </div>
+      <div class="bn-attrs">`;
+    for (const [key, attr] of Object.entries(npc.attrs)) {
+      html += `<div class="bn-attr">
+        <span class="ba-label">${attr.name}</span>
+        <span class="ba-val">${attr.value}</span>
+      </div>`;
+    }
+    html += `</div>`;
+    // Weapons
+    html += `<div class="bn-section"><div class="bn-section-title">武器</div>`;
+    npc.weapons.forEach(w => {
+      html += `<div class="bn-weapon-line"><span class="bnw-name">${w.name}</span><span class="bnw-dmg">${w.damage}</span></div>`;
+    });
+    html += `</div>`;
+    // Inventory
+    html += `<div class="bn-section"><div class="bn-section-title">物品</div>`;
+    npc.inventory.forEach(item => {
+      html += `<div class="bn-inv-line"><span class="bni-loc">${item.location}</span> ${item.name}</div>`;
+    });
+    html += `</div>`;
+    // Status
+    html += `<div class="bn-section"><div class="bn-section-title">状态</div>`;
+    if (npc.insanityEffects.length > 0) {
+      html += `<div class="bn-status-line">`;
+      npc.insanityEffects.forEach(eff => {
+        html += `<span class="bn-status-tag">${eff.name}</span>`;
+      });
+      html += `</div>`;
+    } else {
+      html += `<span class="bn-status-none">正常</span>`;
+    }
+    html += `</div>`;
+    html += `</div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ===== VIEW 3: Combat Notes =====
+function renderCombat(c) {
+  const el = document.getElementById('combatArea');
+  const hpPct = c.hp.max > 0 ? Math.round(c.hp.current / c.hp.max * 100) : 100;
+  const hpColor = hpPct > 60 ? 'var(--success)' : hpPct > 30 ? 'var(--warning)' : 'var(--danger)';
+  const dbInfo = getCharDB(c);
+  const combatSkills = getCombatSkills(c);
+
+  let html = '';
+
+  // Main character combat note
+  html += `<div class="combat-note">
+    <div class="cn-top">
+      <span class="cn-name">${c.name}</span>
+      <div class="cn-hp-bar"><div class="cn-hp-fill" style="width:${hpPct}%;background:${hpColor};"></div></div>
+      <span class="cn-hp-text" style="color:${hpColor}">${c.hp.current}/${c.hp.max}</span>
+    </div>
+    <div class="cn-combat-stats">
+      <div class="cn-cs"><span class="cs-label">先攻</span><span class="cs-val">${c.attributes.dex.value}</span></div>
+      <div class="cn-cs"><span class="cs-label">移动</span><span class="cs-val">${c.mov}</span></div>
+      <div class="cn-cs"><span class="cs-label">护甲</span><span class="cs-val">${c.armor}</span></div>
+      <div class="cn-cs"><span class="cs-label">伤害</span><span class="cs-val">${dbInfo.db}</span></div>
+    </div>`;
+
+  // Combat skills (fight/dodge/shooting)
+  if (combatSkills.length > 0) {
+    html += `<div class="cn-skills">
+      <div class="cn-skills-title">战斗技能</div>`;
+    combatSkills.forEach(sk => {
+      html += `<div class="cn-skill-row">
+        <span class="cns-name">${sk.name}</span>
+        <span class="cns-rate">${sk.total}</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Weapons (damage only)
+  html += `<div class="cn-weapons">
+    <div class="cnw-title">武器</div>`;
+  c.weapons.forEach(w => {
+    html += `<div class="cn-weapon-row">
+      <span class="cnw-name">${w.name}</span>
+      <span class="cnw-dmg">${w.damage}</span>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Status (insanity effects)
+  html += `<div class="cn-status">`;
+  if (c.insanityEffects.length > 0) {
+    c.insanityEffects.forEach(eff => {
+      html += `<span class="cn-status-tag">${eff.name}</span>`;
+    });
+  } else {
+    html += `<span class="cn-status-ok">理智正常</span>`;
+  }
+  html += `</div></div>`;
+
+  // NPC combat examples
+  const combatNpcs = [
+    {
+      name: '不明身份男子',
+      hp: 8, maxHp: 10, dex: 50, mov: 7, armor: 0,
+      str: 55, siz: 65,
+      weapons: [{ name: '拳头', damage: '1D3' }, { name: '短刀', damage: '1D4+1' }],
+      combatSkills: [{ name: '格斗(斗殴)', total: 25 }, { name: '闪避', total: 25 }],
+      insanityEffects: []
+    },
+    {
+      name: 'Mary Watson',
+      hp: 12, maxHp: 12, dex: 70, mov: 7, armor: 0,
+      str: 35, siz: 50,
+      weapons: [{ name: '手术刀', damage: '1D4' }],
+      combatSkills: [{ name: '闪避', total: 35 }, { name: '格斗(斗殴)', total: 20 }, { name: '急救', total: 55 }],
+      insanityEffects: [{ name: '洁癖强迫' }]
+    }
+  ];
+
+  combatNpcs.forEach(npc => {
+    const npcHpPct = Math.round(npc.hp / npc.maxHp * 100);
+    const npcHpColor = npcHpPct > 60 ? 'var(--success)' : npcHpPct > 30 ? 'var(--warning)' : 'var(--danger)';
+    const npcDb = calcDB(npc.str, npc.siz);
+
+    html += `<div class="combat-note">
+      <div class="cn-top">
+        <span class="cn-name">${npc.name}</span>
+        <div class="cn-hp-bar"><div class="cn-hp-fill" style="width:${npcHpPct}%;background:${npcHpColor};"></div></div>
+        <span class="cn-hp-text" style="color:${npcHpColor}">${npc.hp}/${npc.maxHp}</span>
+      </div>
+      <div class="cn-combat-stats">
+        <div class="cn-cs"><span class="cs-label">先攻</span><span class="cs-val">${npc.dex}</span></div>
+        <div class="cn-cs"><span class="cs-label">移动</span><span class="cs-val">${npc.mov}</span></div>
+        <div class="cn-cs"><span class="cs-label">护甲</span><span class="cs-val">${npc.armor}</span></div>
+        <div class="cn-cs"><span class="cs-label">伤害</span><span class="cs-val">${npcDb.db}</span></div>
+      </div>`;
+
+    if (npc.combatSkills.length > 0) {
+      html += `<div class="cn-skills"><div class="cn-skills-title">战斗技能</div>`;
+      npc.combatSkills.forEach(sk => {
+        html += `<div class="cn-skill-row">
+          <span class="cns-name">${sk.name}</span>
+          <span class="cns-rate">${sk.total}</span>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    html += `<div class="cn-weapons"><div class="cnw-title">武器</div>`;
+    npc.weapons.forEach(w => {
+      html += `<div class="cn-weapon-row">
+        <span class="cnw-name">${w.name}</span>
+        <span class="cnw-dmg">${w.damage}</span>
+      </div>`;
+    });
+    html += `</div>`;
+
+    html += `<div class="cn-status">`;
+    if (npc.insanityEffects.length > 0) {
+      npc.insanityEffects.forEach(eff => {
+        html += `<span class="cn-status-tag">${eff.name}</span>`;
+      });
+    } else {
+      html += `<span class="cn-status-ok">理智正常</span>`;
+    }
+    html += `</div></div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+// ===== Init =====
+render();
+</script>
+</body>
+</html>

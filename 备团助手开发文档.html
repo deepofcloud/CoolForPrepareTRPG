@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>备团助手 - 开发文档 v1.0</title>
+<style>
+  :root {
+    --bg: #faf8f5;
+    --bg2: #f0ece4;
+    --card: #ffffff;
+    --accent: #b8976a;
+    --accent-dark: #9a7d55;
+    --text: #3a3a3a;
+    --text-muted: #777777;
+    --border: #e0dbd2;
+    --code-bg: #f5f2ec;
+    --shadow: rgba(0,0,0,0.06);
+    --radius: 10px;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 15px; scroll-behavior: smooth; }
+  body {
+    font-family: "Noto Sans SC", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.8;
+  }
+
+  /* === Layout === */
+  .layout { display: flex; min-height: 100vh; }
+
+  /* === Sidebar === */
+  .sidebar {
+    width: 280px;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0; left: 0; bottom: 0;
+    overflow-y: auto;
+    padding: 24px 0;
+    z-index: 10;
+  }
+  .sidebar-title {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent-dark);
+    padding: 0 24px 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 12px;
+  }
+  .sidebar-title small { display: block; font-size: 12px; color: var(--text-muted); font-weight: 400; margin-top: 2px; }
+  .sidebar nav a {
+    display: block;
+    padding: 7px 24px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13.5px;
+    border-left: 3px solid transparent;
+    transition: all 0.15s ease;
+  }
+  .sidebar nav a:hover { background: var(--bg2); color: var(--accent-dark); }
+  .sidebar nav a.active { border-left-color: var(--accent); background: var(--bg2); color: var(--accent-dark); font-weight: 600; }
+  .sidebar nav .nav-group { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); padding: 16px 24px 6px; font-weight: 600; }
+
+  /* === Main Content === */
+  .main { margin-left: 280px; flex: 1; padding: 40px 48px 80px; max-width: 1060px; }
+
+  /* === Header === */
+  .doc-header {
+    text-align: center;
+    padding: 32px 0 40px;
+    margin-bottom: 40px;
+    border-bottom: 2px solid var(--accent);
+  }
+  .doc-header h1 { font-size: 2rem; color: var(--accent-dark); margin-bottom: 8px; }
+  .doc-header .meta { font-size: 13px; color: var(--text-muted); }
+
+  /* === Sections === */
+  section { margin-bottom: 48px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 1.45rem; color: var(--accent-dark); margin-bottom: 16px;
+    padding-bottom: 8px; border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; color: var(--text); margin: 24px 0 10px; }
+  h4 { font-size: 1rem; color: var(--text); margin: 16px 0 8px; }
+  p { margin-bottom: 12px; }
+
+  /* === Cards === */
+  .feature-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 4px var(--shadow);
+  }
+  .feature-card h4 { margin-top: 0; color: var(--accent-dark); }
+
+  /* === Tags === */
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-right: 4px;
+    font-weight: 600;
+  }
+  .tag-module { background: #e8dfd0; color: #7a6540; }
+  .tag-feature { background: #d4e8d9; color: #3a7a4a; }
+  .tag-data { background: #d8e4f0; color: #3a6090; }
+  .tag-ui { background: #f0d8e8; color: #8a3a6a; }
+  .tag-shortcut { background: #e8e0f0; color: #5a3a8a; }
+
+  /* === Table === */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 20px;
+    font-size: 13.5px;
+  }
+  th, td {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    text-align: left;
+  }
+  th { background: var(--bg2); font-weight: 600; color: var(--accent-dark); }
+  td { background: var(--card); }
+
+  /* === Code === */
+  code {
+    font-family: "JetBrains Mono", "Fira Code", monospace;
+    background: var(--code-bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 13px;
+    color: #8a5a2a;
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px 18px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.6;
+    margin: 10px 0 16px;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+
+  /* === Lists === */
+  ul, ol { margin: 8px 0 16px 24px; }
+  li { margin-bottom: 4px; }
+
+  /* === Info Box === */
+  .info-box {
+    background: #f0ead8;
+    border-left: 4px solid var(--accent);
+    padding: 12px 18px;
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0 20px;
+    font-size: 13.5px;
+  }
+  .info-box.warn { background: #f8ece0; border-left-color: #d48a4a; }
+
+  /* === TOC Overview === */
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 14px;
+    margin: 16px 0 24px;
+  }
+  .overview-item {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 1px 3px var(--shadow);
+  }
+  .overview-item h4 { margin: 0 0 6px; color: var(--accent-dark); font-size: 14px; }
+  .overview-item p { margin: 0; font-size: 12.5px; color: var(--text-muted); }
+
+  /* === Responsive === */
+  @media (max-width: 800px) {
+    .sidebar { display: none; }
+    .main { margin-left: 0; padding: 24px 16px 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ========== Sidebar ========== -->
+<aside class="sidebar">
+  <div class="sidebar-title">
+    备团助手 开发文档
+    <small>v1.0 &middot; 2026-06-24</small>
+  </div>
+  <nav>
+    <div class="nav-group">概述</div>
+    <a href="#overview">项目简介</a>
+    <a href="#tech-stack">技术架构</a>
+    <a href="#file-structure">文件结构</a>
+    <a href="#data-model">数据模型</a>
+
+    <div class="nav-group">核心模块</div>
+    <a href="#appstate">AppState 状态管理</a>
+    <a href="#storage">StorageManager 存档管理</a>
+    <a href="#uirender">UIRender 界面渲染</a>
+    <a href="#app">App 事件处理</a>
+
+    <div class="nav-group">功能模块</div>
+    <a href="#pdf">PDFProcessor 文档导入</a>
+    <a href="#editor">DocEditor 富文本编辑器</a>
+    <a href="#database">DatabaseManager 数据库</a>
+    <a href="#board">BoardManager 带团板</a>
+
+    <div class="nav-group">附录</div>
+    <a href="#shortcuts">快捷键一览</a>
+    <a href="#db-types">数据库类型一览</a>
+    <a href="#icons">图标系统</a>
+  </nav>
+</aside>
+
+<!-- ========== Main ========== -->
+<main class="main">
+
+<div class="doc-header">
+  <h1>备团助手 &mdash; 开发文档</h1>
+  <div class="meta">GM 备团与带团效率工具 &middot; 单文件 HTML 应用 &middot; 无需联网 &middot; 最后更新 2026-06-24</div>
+</div>
+
+<!-- ==================== 概述 ==================== -->
+<section id="overview">
+  <h2>项目简介</h2>
+  <p>备团助手是一款面向 TRPG（桌上角色扮演游戏）GM 的桌面应用，旨在帮助 GM 高效完成备团和带团两个阶段的核心工作。应用基于 Electron 打包为 .exe 桌面版，无需联网，完全离线运行。</p>
+  <p>工具覆盖 GM 工作流的完整链路：从创建模组、导入 PDF 规则书、编写备团笔记，到在带团过程中使用可视化看板追踪剧情流程、管理 NPC / 线索 / 物品等结构化数据。</p>
+
+  <div class="overview-grid">
+    <div class="overview-item"><h4>模组管理</h4><p>创建、打开、删除多个独立模组，支持 D&D 5E / 3.5 / COC 7th / 自定义规则系统</p></div>
+    <div class="overview-item"><h4>PDF 智能导入</h4><p>解析 PDF 规则书，自动提取文本、识别标题层级、角色数据块、表格，保留原文颜色</p></div>
+    <div class="overview-item"><h4>富文本编辑器</h4><p>基于 contentEditable 的完整编辑器，支持格式化、图片、表格、查找替换、目录导航</p></div>
+    <div class="overview-item"><h4>结构化数据库</h4><p>15 种分类数据库（角色、线索、场景、物品等），支持搜索、编辑、一键入库</p></div>
+    <div class="overview-item"><h4>可视化带团板</h4><p>无限画布 + 流程单元 + 便签卡片 + 连线系统，带团时的实时可视化看板</p></div>
+    <div class="overview-item"><h4>本地存储</h4><p>基于 Electron 原生文件系统 API，直写本地 JSON 文件，目录路径跨会话记忆</p></div>
+  </div>
+</section>
+
+<section id="tech-stack">
+  <h2>技术架构</h2>
+  <p>应用基于 Electron 框架打包为桌面版（.exe），核心代码为自包含的单 HTML 文件（约 350KB），不依赖任何外部 CDN 或网络资源。核心技术选型如下：</p>
+  <table>
+    <tr><th>层面</th><th>技术</th><th>说明</th></tr>
+    <tr><td>运行时</td><td>Electron 33.x</td><td>打包为 Windows 桌面应用，菜单栏隐藏，独立窗口运行</td></tr>
+    <tr><td>主进程</td><td>Node.js + fs 模块</td><td>处理原生文件读写、目录选择对话框、配置持久化</td></tr>
+    <tr><td>渲染进程</td><td>原生 HTML + CSS + JavaScript</td><td>无第三方 UI 框架，零依赖</td></tr>
+    <tr><td>进程通信</td><td>contextBridge + ipcRenderer/ipcMain</td><td>contextIsolation 隔离，通过 electronAPI 桥接调用</td></tr>
+    <tr><td>PDF 解析</td><td>PDF.js (pdfjsLib)</td><td>本地内嵌 pdf.min.js + pdf.worker.min.js</td></tr>
+    <tr><td>富文本</td><td>contentEditable + execCommand</td><td>原生富文本编辑能力</td></tr>
+    <tr><td>存储</td><td>Electron 原生文件系统 API</td><td>主进程通过 fs 模块直写本地 JSON 文件，目录路径持久化</td></tr>
+    <tr><td>图标</td><td>内联 SVG Sprite</td><td>40+ 手绘风格 SVG 图标</td></tr>
+    <tr><td>画布</td><td>DOM + SVG 混合</td><td>便签用 DOM 渲染，连线用 SVG 绘制</td></tr>
+  </table>
+</section>
+
+<section id="file-structure">
+  <h2>文件结构</h2>
+  <pre><code>备团助手/
+├── electron-app/             # Electron 项目目录
+│   ├── main.js              # 主进程入口（窗口创建、IPC 处理器、原生文件操作）
+│   ├── preload.js           # 预加载脚本（contextBridge 暴露 electronAPI）
+│   ├── package.json         # Electron 配置与构建脚本
+│   ├── index.html           # 渲染进程主应用文件（自包含全部 UI 代码）
+│   ├── libs/
+│   │   ├── pdf.min.js       # PDF.js 核心库
+│   │   └── pdf.worker.min.js# PDF.js Worker 线程
+│   ├── icon.ico             # 应用图标
+│   └── dist/                # 构建产物
+│       └── win-unpacked/    # Windows 解压版
+│           └── 御备团CoolForPrepareTRPG.exe
+├── user-guide.html          # 用户手册
+├── 备团助手开发文档.html     # 本开发文档
+└── .uploads/                # 上传临时目录</code></pre>
+  <p>渲染进程的所有应用逻辑、样式和 HTML 模板均内嵌在 <code>electron-app/index.html</code> 中。代码按模块组织，从文件顶部到底部依次为：CSS 样式 → SVG 图标精灵 → HTML 模板 → JavaScript 模块。主进程 <code>main.js</code> 负责窗口管理和原生文件系统操作，通过 <code>preload.js</code> 的 contextBridge 向渲染进程暴露 <code>window.electronAPI</code> 接口。</p>
+</section>
+
+<section id="data-model">
+  <h2>数据模型</h2>
+  <p>每个模组（Module）是一个独立的 JSON 对象，包含以下顶层字段：</p>
+  <table>
+    <tr><th>字段</th><th>类型</th><th>说明</th></tr>
+    <tr><td><code>id</code></td><td>string</td><td>UUID 唯一标识</td></tr>
+    <tr><td><code>name</code></td><td>string</td><td>模组名称</td></tr>
+    <tr><td><code>system</code></td><td>string</td><td>规则系统（dnd5e / dnd35 / coc7 / custom）</td></tr>
+    <tr><td><code>status</code></td><td>string</td><td>状态：draft / active / completed</td></tr>
+    <tr><td><code>createdAt</code></td><td>string</td><td>创建时间（ISO 8601）</td></tr>
+    <tr><td><code>updatedAt</code></td><td>string</td><td>最后更新时间</td></tr>
+    <tr><td><code>pdfFileName</code></td><td>string</td><td>关联的 PDF 文件名</td></tr>
+    <tr><td><code>document</code></td><td>object</td><td>文档数据（htmlContent, rawText, pages, bookmarks）</td></tr>
+    <tr><td><code>databases</code></td><td>object</td><td>15 个分类数据库的条目数组</td></tr>
+    <tr><td><code>board</code></td><td>object</td><td>带团板数据（flowUnits, unitType）</td></tr>
+  </table>
+
+  <h3>文档对象 (document)</h3>
+  <table>
+    <tr><td><code>htmlContent</code></td><td>string</td><td>编辑器 HTML 内容</td></tr>
+    <tr><td><code>rawText</code></td><td>string</td><td>纯文本内容（PDF 导入原始文本）</td></tr>
+    <tr><td><code>pages</code></td><td>array</td><td>PDF 逐页文本数组</td></tr>
+    <tr><td><code>bookmarks</code></td><td>array</td><td>PDF 书签/大纲（含 title, level）</td></tr>
+  </table>
+
+  <h3>带团板对象 (board)</h3>
+  <table>
+    <tr><td><code>flowUnits</code></td><td>array</td><td>流程单元列表，每个单元包含 notes[], connections[], viewport{}</td></tr>
+    <tr><td><code>unitType</code></td><td>string</td><td>组织方式：scene（以场景为单元）/ plot（以剧情为单元）</td></tr>
+  </table>
+
+  <h3>流程单元 (flowUnit)</h3>
+  <table>
+    <tr><td><code>id</code></td><td>string</td><td>单元唯一 ID</td></tr>
+    <tr><td><code>title</code></td><td>string</td><td>单元标题</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>单元描述</td></tr>
+    <tr><td><code>notes</code></td><td>array</td><td>便签卡片列表</td></tr>
+    <tr><td><code>connections</code></td><td>array</td><td>连线列表（from, to, color）</td></tr>
+    <tr><td><code>viewport</code></td><td>object</td><td>视口状态 { x, y, scale }</td></tr>
+    <tr><td><code>sourceEntryId</code></td><td>string</td><td>来源数据库条目 ID（向导创建时）</td></tr>
+  </table>
+
+  <h3>便签卡片 (note)</h3>
+  <table>
+    <tr><td><code>id</code></td><td>string</td><td>便签唯一 ID</td></tr>
+    <tr><td><code>type</code></td><td>string</td><td>类型（对应数据库 key）</td></tr>
+    <tr><td><code>title</code></td><td>string</td><td>标题</td></tr>
+    <tr><td><code>content</code></td><td>string</td><td>文本内容</td></tr>
+    <tr><td><code>x, y</code></td><td>number</td><td>虚拟坐标</td></tr>
+    <tr><td><code>width</code></td><td>number</td><td>宽度（默认 200）</td></tr>
+    <tr><td><code>used</code></td><td>boolean</td><td>是否已标记使用</td></tr>
+    <tr><td><code>locked</code></td><td>boolean</td><td>是否锁定位置</td></tr>
+    <tr><td><code>sourceEntryId</code></td><td>string</td><td>来源数据库条目 ID</td></tr>
+    <tr><td><code>characterData</code></td><td>object</td><td>角色完整数据（仅角色类型）</td></tr>
+    <tr><td><code>diceRanges</code></td><td>array</td><td>骰子范围数据（仅遭遇/盲盒类型）</td></tr>
+    <tr><td><code>styles</code></td><td>object</td><td>纯文本块样式属性</td></tr>
+  </table>
+</section>
+
+<!-- ==================== 核心模块 ==================== -->
+<section id="appstate">
+  <h2>AppState &mdash; 状态管理模块</h2>
+  <span class="tag tag-module">核心</span> <span class="tag tag-data">数据</span>
+  <p>AppState 是全局状态管理中心，维护应用运行时的所有状态数据。</p>
+
+  <h3>核心状态字段</h3>
+  <table>
+    <tr><th>字段</th><th>说明</th></tr>
+    <tr><td><code>currentPage</code></td><td>当前页面：home / editor / board</td></tr>
+    <tr><td><code>modules</code></td><td>所有模组对象数组</td></tr>
+    <tr><td><code>currentModuleId</code></td><td>当前打开的模组 ID</td></tr>
+    <tr><td><code>currentModule</code></td><td>当前模组的完整数据引用</td></tr>
+    <tr><td><code>workDirPath</code></td><td>Electron 原生方案的工作目录路径</td></tr>
+    <tr><td><code>workDirHandle</code></td><td>浏览器 File System Access API 目录句柄（渲染层底子保留）</td></tr>
+    <tr><td><code>useFileSystemAPI</code></td><td>是否启用文件系统 API 模式</td></tr>
+    <tr><td><code>placedEntryIds</code></td><td>Set 集合，记录已放置到带团板的数据库条目 ID</td></tr>
+  </table>
+
+  <h3>工具方法</h3>
+  <ul>
+    <li><code>createEmptyModule(name, system)</code> &mdash; 创建空模组，初始化 document、15 个数据库、board 等完整结构</li>
+    <li><code>generateUUID()</code> &mdash; 生成 UUID v4 格式唯一标识符</li>
+    <li><code>findModule(id)</code> &mdash; 按 ID 查找模组</li>
+    <li><code>formatTime(isoStr)</code> &mdash; 格式化时间为 "YYYY-MM-DD HH:mm"</li>
+    <li><code>getStatusLabel / getStatusClass</code> &mdash; 获取模组状态的中文标签和 CSS 类名</li>
+    <li><code>getModuleIcon(index)</code> &mdash; 循环分配模组图标（城堡、龙、剑、卷轴等 8 种）</li>
+  </ul>
+</section>
+
+<section id="storage">
+  <h2>StorageManager &mdash; 存档管理模块</h2>
+  <span class="tag tag-module">核心</span> <span class="tag tag-data">存储</span>
+  <p>基于 Electron 原生文件系统 API，直写本地 JSON 文件。主进程通过 <code>fs</code> 模块处理文件读写，工作目录路径持久化存储在 userData 目录的配置文件中。</p>
+
+  <h3>架构设计</h3>
+  <div class="feature-card">
+    <h4>主进程（main.js）</h4>
+    <p>负责原生文件操作，通过 ipcMain.handle 注册 IPC 处理器：<code>pick-directory</code>（目录选择对话框）、<code>list-json-files</code>（列出 JSON 文件）、<code>read-file</code> / <code>write-file</code>（文件读写）、<code>delete-file</code>（文件删除）、<code>check-dir</code>（目录检查）、<code>get-last-dir</code>（恢复上次目录）。配置文件路径：<code>userData/cfpt-config.json</code>。</p>
+  </div>
+  <div class="feature-card">
+    <h4>预加载脚本（preload.js）</h4>
+    <p>通过 <code>contextBridge.exposeInMainWorld</code> 将 IPC 调用封装为 <code>window.electronAPI</code> 对象暴露给渲染进程，保持 contextIsolation 安全隔离。</p>
+  </div>
+  <div class="feature-card">
+    <h4>渲染进程（index.html）</h4>
+    <p>StorageManager 检测到 <code>window.electronAPI</code> 存在后，优先使用原生文件系统方案：<code>AppState.workDirPath</code> 存储工作目录路径，<code>AppState.useFileSystemAPI</code> 标记启用文件系统模式。代码同时保留浏览器 File System Access API 的兼容逻辑（通过 <code>workDirHandle</code>），作为渲染层底子的通用支持。</p>
+  </div>
+
+  <h3>核心功能</h3>
+  <table>
+    <tr><th>方法</th><th>功能</th></tr>
+    <tr><td><code>init()</code></td><td>初始化存储，检测 electronAPI，恢复工作目录，加载模组数据</td></tr>
+    <tr><td><code>pickWorkDir()</code></td><td>调用 electronAPI.pickDirectory() 让用户指定工作目录</td></tr>
+    <tr><td><code>loadModulesFromFileSystem()</code></td><td>遍历工作目录下所有 .json 文件并加载</td></tr>
+    <tr><td><code>saveModuleToFileSystem(module)</code></td><td>通过 electronAPI.writeFile() 将模组序列化为 JSON 写入文件</td></tr>
+    <tr><td><code>deleteModuleFromFileSystem(module)</code></td><td>通过 electronAPI.deleteFile() 删除模组对应的 JSON 文件</td></tr>
+    <tr><td><code>scheduleSave()</code></td><td>2 秒防抖保存，触发 saveNow()</td></tr>
+    <tr><td><code>saveNow()</code></td><td>立即保存所有模组到文件系统</td></tr>
+  </table>
+</section>
+
+<section id="uirender">
+  <h2>UIRender &mdash; 界面渲染模块</h2>
+  <span class="tag tag-module">核心</span> <span class="tag tag-ui">UI</span>
+  <p>负责所有 DOM 更新和页面渲染。</p>
+
+  <h3>页面结构</h3>
+  <p>应用包含三个主页面，通过 <code>.page-section</code> 的 active 类切换显示：</p>
+  <table>
+    <tr><th>页面 ID</th><th>名称</th><th>功能</th></tr>
+    <tr><td><code>pageHome</code></td><td>首页 / 仪表盘</td><td>模组列表、创建入口、工作目录引导</td></tr>
+    <tr><td><code>pageEditor</code></td><td>编辑器页面</td><td>富文本编辑、PDF 导入、目录导航、数据库面板</td></tr>
+    <tr><td><code>pageBoard</code></td><td>带团板页面</td><td>可视化看板、流程单元、便签、连线</td></tr>
+  </table>
+
+  <h3>渲染功能</h3>
+  <ul>
+    <li><code>renderModuleList()</code> &mdash; 渲染模组卡片列表（图标、名称、系统、状态、更新时间）</li>
+    <li><code>switchPage(page)</code> &mdash; 页面切换，自动初始化对应模块（编辑器 / 带团板）</li>
+    <li><code>showSaveStatus(status)</code> &mdash; 显示保存状态（保存中 / 已保存+时间 / 保存失败）</li>
+  </ul>
+</section>
+
+<section id="app">
+  <h2>App &mdash; 事件处理模块</h2>
+  <span class="tag tag-module">核心</span>
+  <p>处理所有用户交互事件，协调各模块之间的业务逻辑。</p>
+
+  <h3>模组生命周期</h3>
+  <ul>
+    <li><code>showCreateDialog()</code> &mdash; 弹出创建模组对话框（名称 + 规则系统 + PDF 关联）</li>
+    <li><code>confirmCreate()</code> &mdash; 创建空模组，关联 PDF，自动进入编辑器；如有 PDF 则异步导入</li>
+    <li><code>openModule(id)</code> &mdash; 打开指定模组，切换到编辑器页面</li>
+    <li><code>showDeleteConfirm(id)</code> &mdash; 二次确认后删除模组</li>
+    <li><code>goHome()</code> &mdash; 返回首页，自动保存未保存内容</li>
+  </ul>
+
+  <h3>页面导航</h3>
+  <ul>
+    <li><code>switchToBoard()</code> &mdash; 从编辑器切换到带团板</li>
+    <li><code>switchToEditor()</code> &mdash; 从带团板返回编辑器</li>
+    <li><code>handleRunSession()</code> &mdash; "备团/带团"按钮入口，无模组时引导创建</li>
+  </ul>
+
+  <h3>全局交互</h3>
+  <ul>
+    <li>ESC 键关闭所有弹出对话框</li>
+    <li>点击模态框遮罩层关闭对话框</li>
+    <li>创建对话框支持回车键快捷确认</li>
+    <li><code>manualSave()</code> 手动触发保存</li>
+  </ul>
+</section>
+
+<!-- ==================== 功能模块 ==================== -->
+<section id="pdf">
+  <h2>PDFProcessor &mdash; PDF 智能导入模块</h2>
+  <span class="tag tag-feature">功能</span> <span class="tag tag-data">数据</span>
+  <p>这是本工具最核心的差异化功能之一。以 PDF.js 为底层引擎，对 TRPG 规则书进行深度解析，将 PDF 内容转化为可编辑的富文本格式。</p>
+  <div class="info-box">核心原则：文本顺序以 <code>getTextContent()</code> 为准，颜色信息作为附加增强层。</div>
+
+  <h3>处理流程</h3>
+  <p>读取 PDF &rarr; 逐页提取文本与格式 &rarr; 双源颜色提取 &rarr; 结构分析（标题/角色/表格） &rarr; 生成 HTML &rarr; 存入模组数据</p>
+
+  <h3>文本提取与格式增强</h3>
+  <ul>
+    <li>逐页遍历 PDF，调用 <code>page.getTextContent()</code> 获取文本项</li>
+    <li>为每个文本项附加格式属性：字号（从 transform 矩阵计算）、字体名、加粗/斜体标记</li>
+    <li>自动检测页码行（支持"第X页"、"- X -"、"X / Y"等多种格式）并清除</li>
+    <li>按 Y 坐标进行行分组（差值 &gt; 3px 为新行），再按行间距进行段落分组</li>
+  </ul>
+
+  <h3>双源颜色提取</h3>
+  <div class="feature-card">
+    <h4>源 1：操作符列表法（主要，100% 准确）</h4>
+    <p>遍历 PDF 操作符列表，追踪填充色/描边色/CTM/TextMatrix 以及图形状态栈。支持 RGB、灰度、CMYK（自动转 RGB）、ICC/DeviceN 等颜色空间。在文本渲染操作符处记录位置和颜色。</p>
+  </div>
+  <div class="feature-card">
+    <h4>源 2：Canvas 采样法（辅助）</h4>
+    <p>将 PDF 页面以 4 倍分辨率渲染到 Canvas，对每个文本项中心 15x15 像素区域采样。按亮度排序后寻找最大间隔（谷底），取暗组平均色作为文字颜色。</p>
+  </div>
+  <p>双源匹配时优先使用操作符列表结果（距离阈值 15px），Canvas 采样补充未覆盖的项（阈值 20px）。接近白色的提取结果会自动降低亮度以保证可读性。</p>
+
+  <h3>标题识别（多策略融合）</h3>
+  <table>
+    <tr><th>策略</th><th>规则</th></tr>
+    <tr><td>书签匹配</td><td>PDF 自带书签/大纲，文本与书签标题匹配则直接使用书签层级（最大 3 级）</td></tr>
+    <tr><td>字号比例</td><td>&ge; 1.25 倍正文 &rarr; H1；&ge; 1.1 倍 &rarr; H2；&ge; 1.05 倍且加粗 &rarr; H3</td></tr>
+    <tr><td>颜色判断</td><td>非黑色 + 字号不小于正文 95% + 短文本 &rarr; H2</td></tr>
+    <tr><td>全加粗</td><td>全加粗 + 短文本 + 字号接近正文 &rarr; H3</td></tr>
+    <tr><td>启发式补充</td><td>短文本（2-30 字符）+ 无标点 + 非编号 + 后续有较长内容 &rarr; 识别为标题</td></tr>
+  </table>
+
+  <h3>角色数据块识别</h3>
+  <p>专门针对 TRPG 怪物/NPC 数据块的智能识别。当某行命中 2 个以上关键词（护甲等级/AC、生命值/HP、速度、力量、敏捷、体质、智力、感知、魅力、挑战等级/CR、技能、感官、语言、豁免、伤害抗性等）时，自动向前后扩展找到完整数据块，提取各字段值，并将角色名（数据块第一行）和完整数据存入角色数据库。</p>
+
+  <h3>表格识别</h3>
+  <p>检测 Markdown 风格表格（包含多个 <code>|</code> 的行），识别分隔行（<code>|---|---|</code>），解析表头和数据行，生成完整的 HTML <code>&lt;table&gt;</code> 结构。</p>
+
+  <h3>PDF 书签处理</h3>
+  <p>调用 <code>pdf.getOutline()</code> 提取 PDF 书签，递归展平为目录结构（最大 3 级），存储在 <code>mod.document.bookmarks</code> 中，用于编辑器目录树渲染和标题识别匹配。</p>
+
+  <h3>进度反馈</h3>
+  <p>处理过程中显示进度条，实时更新"当前页/总页数 + 处理阶段描述"。完成后显示 Toast 提示，汇总页数、标题数、角色数、表格数。</p>
+</section>
+
+<section id="editor">
+  <h2>DocEditor &mdash; 富文本编辑器模块</h2>
+  <span class="tag tag-feature">功能</span> <span class="tag tag-ui">UI</span>
+  <p>基于 <code>contentEditable</code> 的完整富文本编辑器，是 GM 备团阶段的核心工作区。</p>
+
+  <h3>文本格式化</h3>
+  <table>
+    <tr><th>功能</th><th>快捷键</th><th>说明</th></tr>
+    <tr><td>加粗</td><td><span class="tag tag-shortcut">Ctrl+B</span></td><td>execCommand bold</td></tr>
+    <tr><td>斜体</td><td><span class="tag tag-shortcut">Ctrl+I</span></td><td>execCommand italic</td></tr>
+    <tr><td>下划线</td><td><span class="tag tag-shortcut">Ctrl+U</span></td><td>execCommand underline</td></tr>
+    <tr><td>删除线</td><td>&mdash;</td><td>execCommand strikeThrough</td></tr>
+    <tr><td>标题 H1-H4</td><td>&mdash;</td><td>工具栏按钮切换</td></tr>
+    <tr><td>有序/无序列表</td><td>&mdash;</td><td>execCommand insertOrderedList / insertUnorderedList</td></tr>
+    <tr><td>引用块</td><td>&mdash;</td><td>execCommand formatBlock blockquote</td></tr>
+    <tr><td>水平分割线</td><td>&mdash;</td><td>execCommand insertHorizontalRule</td></tr>
+    <tr><td>字号设置</td><td>&mdash;</td><td>下拉选择 8-36px，或 +/- 按钮微调（范围 8-48px）</td></tr>
+    <tr><td>字体颜色</td><td>&mdash;</td><td>颜色拾取器，用 surroundContents 包裹实现</td></tr>
+    <tr><td>行距调整</td><td>&mdash;</td><td>单倍 / 1.5 倍 / 2 倍 / 自定义，独立撤销栈</td></tr>
+    <tr><td>缩进控制</td><td>&mdash;</td><td>增加/减少缩进</td></tr>
+  </table>
+
+  <h3>撤销与重做</h3>
+  <ul>
+    <li>全局撤销/重做基于浏览器原生 execCommand（<span class="tag tag-shortcut">Ctrl+Z</span> / <span class="tag tag-shortcut">Ctrl+Y</span>）</li>
+    <li>行距变更有独立的撤销栈，不干扰全局撤销历史</li>
+  </ul>
+
+  <h3>查找与替换</h3>
+  <ul>
+    <li>底部弹出查找替换栏</li>
+    <li>查找下一个（使用 <code>window.find</code>）</li>
+    <li>替换当前匹配（替换后自动跳到下一个）</li>
+    <li>全部替换（通过临时 DOM 节点递归替换，不破坏 HTML 标签结构）</li>
+    <li>实时匹配计数显示</li>
+  </ul>
+
+  <h3>图片与表格</h3>
+  <ul>
+    <li><strong>图片</strong>：通过 FileReader 读取为 Base64 DataURL，用 execCommand insertImage 插入</li>
+    <li><strong>表格</strong>：弹出面板指定行列数（行 1-20，列 1-10），自动生成带 thead/tbody 的完整表格</li>
+  </ul>
+
+  <h3>编辑器缩放</h3>
+  <p>通过滑块控制 50%-200% 缩放，使用 CSS <code>transform: scale()</code> 实现，同步调整父容器宽度。</p>
+
+  <h3>目录树（TOC）</h3>
+  <ul>
+    <li>优先使用 PDF 书签数据生成目录；回退方案从 DOM 中提取 H1/H2/H3</li>
+    <li>点击目录条目平滑滚动到对应标题位置</li>
+    <li>滚动时自动高亮当前可视区域对应的目录条目</li>
+    <li>支持折叠/展开</li>
+  </ul>
+
+  <h3>右键上下文菜单</h3>
+  <p>阻止浏览器默认右键菜单，显示自定义菜单，包含：</p>
+  <ul>
+    <li>基础操作：剪切、复制、粘贴</li>
+    <li><strong>一键入库</strong>：将选中文本直接添加到指定数据库（角色、线索、场景、物品等 15 种）</li>
+  </ul>
+
+  <h3>自动保存</h3>
+  <p>输入后 3 秒防抖自动保存，将 innerHTML 和 innerText 写入当前模组文档数据。仅在内容实际变化时触发（脏标记管理）。</p>
+
+  <h3>工具栏状态同步</h3>
+  <p>监听 <code>selectionchange</code> 事件，实时同步工具栏按钮的激活状态（加粗/斜体/下划线/字号/颜色/行距）。颜色按钮根据背景色明暗自动切换图标颜色。</p>
+</section>
+
+<section id="database">
+  <h2>DatabaseManager &mdash; 数据库管理模块</h2>
+  <span class="tag tag-feature">功能</span> <span class="tag tag-data">数据</span>
+  <p>结构化的数据管理系统，用于管理跑团过程中涉及的各类信息实体。</p>
+
+  <h3>数据库类型（15 种）</h3>
+  <table>
+    <tr><th>Key</th><th>名称</th><th>用途</th></tr>
+    <tr><td><code>characters</code></td><td>角色/怪物</td><td>NPC 和怪物的完整数据块</td></tr>
+    <tr><td><code>clues</code></td><td>线索/可互动物品</td><td>可调查的物品和线索</td></tr>
+    <tr><td><code>mainCG</code></td><td>主线 CG</td><td>必然触发的关键剧情</td></tr>
+    <tr><td><code>scenes</code></td><td>场景</td><td>地点和环境描述</td></tr>
+    <tr><td><code>specialCG</code></td><td>特殊 CG</td><td>需要特定条件触发的剧情</td></tr>
+    <tr><td><code>items</code></td><td>物品</td><td>物品/装备/魔法物品</td></tr>
+    <tr><td><code>encounters</code></td><td>随机遭遇</td><td>按掷骰触发的遭遇</td></tr>
+    <tr><td><code>other</code></td><td>其他事项</td><td>杂项内容</td></tr>
+    <tr><td><code>endingCG</code></td><td>结局 CG</td><td>不同结局</td></tr>
+    <tr><td><code>rules</code></td><td>规则/机制</td><td>特殊规则和自定义机制</td></tr>
+    <tr><td><code>tasks</code></td><td>任务/目标</td><td>玩家任务</td></tr>
+    <tr><td><code>blindbox</code></td><td>盲盒</td><td>随机奖励</td></tr>
+    <tr><td><code>loot</code></td><td>战利品</td><td>战斗/探索奖励</td></tr>
+    <tr><td><code>traps</code></td><td>陷阱</td><td>场景陷阱</td></tr>
+    <tr><td><code>background</code></td><td>背景知识</td><td>世界观和历史</td></tr>
+  </table>
+
+  <h3>条目管理</h3>
+  <ul>
+    <li><strong>创建</strong>：通过编辑器右键菜单"一键入库"，或在数据库面板中新建</li>
+    <li><strong>编辑</strong>：弹出模态框编辑，角色类型展示完整数据表单（AC/HP/速度/六属性/技能/特质/动作等），其他类型展示标题+内容</li>
+    <li><strong>删除</strong>：二次确认后删除，同步清理 placedEntryIds</li>
+    <li><strong>搜索</strong>：按名称或内容关键词过滤（不区分大小写）</li>
+  </ul>
+
+  <h3>面板交互</h3>
+  <ul>
+    <li>侧边栏面板可在编辑器页面和带团板页面中打开</li>
+    <li>左侧显示数据库类型列表（含条目数量），右侧显示条目卡片</li>
+    <li>在带团板中点击条目卡片即可将对应便签放置到画布上</li>
+    <li>已放置的条目显示为半透明并标注"已放置"</li>
+  </ul>
+</section>
+
+<section id="board">
+  <h2>BoardManager &mdash; 带团板管理模块</h2>
+  <span class="tag tag-feature">功能</span> <span class="tag tag-ui">UI</span>
+  <p>带团阶段的核心可视化看板，采用无限画布设计，支持流程单元、便签卡片、连线系统等丰富的交互功能。</p>
+
+  <h3>流程单元（Flow Units）</h3>
+  <ul>
+    <li><strong>新增</strong>：自动初始化标题、描述、空便签/连线列表和默认视口</li>
+    <li><strong>删除</strong>：二次确认，至少保留一个单元</li>
+    <li><strong>编辑</strong>：双击标题或描述原地编辑，回车/失焦保存，Escape 取消</li>
+    <li><strong>导航</strong>：水平排列，通过轨道位移切换；支持键盘左右箭头；底部缩略图导航条可点击跳转</li>
+    <li><strong>初始化向导</strong>：首次进入时提供"以场景为单元"或"以关键剧情为单元"两种组织方式，从数据库批量生成</li>
+  </ul>
+
+  <h3>便签卡片系统</h3>
+  <div class="feature-card">
+    <h4>便签类型</h4>
+    <p>支持 15 种类型（与数据库类型对应），每种有专属图标。创建时通过 5 列网格面板选择类型。</p>
+  </div>
+  <div class="feature-card">
+    <h4>便签内容</h4>
+    <p>根据类型差异化渲染：</p>
+    <ul>
+      <li><strong>角色类型</strong>：展示完整数据块（中英文名、体型/类型/阵营、AC/先攻/HP/速度、六项属性、技能/免疫/抗性/感官/语言/CR、特质列表、动作列表）</li>
+      <li><strong>遭遇/盲盒类型</strong>：展示可折叠的骰子范围列表（d最小-最大），每段可编辑内容，支持添加更多范围</li>
+      <li><strong>其他类型</strong>：直接显示文本内容</li>
+    </ul>
+  </div>
+  <div class="feature-card">
+    <h4>便签操作</h4>
+    <ul>
+      <li><strong>拖拽移动</strong>：左键拖拽，支持多选批量拖拽，锁定便签不可移动</li>
+      <li><strong>拉伸大小</strong>：右下角拉伸手柄，最小 120x80</li>
+      <li><strong>标记已使用</strong>：切换 used 状态，视觉上添加半透明样式</li>
+      <li><strong>锁定位置</strong>：锁定后不可拖拽，不可被 Delete 批量删除</li>
+      <li><strong>双击编辑</strong>：弹出编辑窗口，角色类型展示完整数据表单</li>
+      <li><strong>删除</strong>：锁定便签删除需二次确认</li>
+    </ul>
+  </div>
+
+  <h3>纯文本块</h3>
+  <p>独立于数据库的自由文本备注块，支持丰富的样式属性：</p>
+  <table>
+    <tr><th>属性</th><th>范围</th></tr>
+    <tr><td>字号</td><td>10-48px</td></tr>
+    <tr><td>透明度</td><td>0.1-1.0（实时显示百分比）</td></tr>
+    <tr><td>文字颜色 / 背景颜色</td><td>颜色选择器，背景色可清除</td></tr>
+    <tr><td>对齐方式</td><td>左 / 中 / 右</td></tr>
+    <tr><td>文字样式</td><td>粗体 / 斜体 / 下划线</td></tr>
+    <tr><td>边框样式</td><td>实线 / 虚线 / 无边框</td></tr>
+  </table>
+
+  <h3>虚拟坐标与视图控制</h3>
+  <table>
+    <tr><th>操作</th><th>方式</th></tr>
+    <tr><td>缩放</td><td>Ctrl + 鼠标滚轮，范围 0.3x-3.0x，以鼠标位置为锚点</td></tr>
+    <tr><td>平移</td><td>鼠标滚轮（无 Ctrl）/ Shift + 滚轮（水平）/ 右键拖拽 / 空格 + 左键拖拽</td></tr>
+    <tr><td>坐标转换</td><td>屏幕坐标与虚拟坐标双向转换，每个单元维护独立 viewport{x, y, scale}</td></tr>
+  </table>
+
+  <h3>框选系统</h3>
+  <ul>
+    <li>在画布空白区域左键按下开始框选，创建可视化选框</li>
+    <li>松开时计算虚拟坐标范围内所有便签加入选中集合</li>
+    <li>选中便签高亮显示，支持批量拖拽和批量删除（Delete/Backspace）</li>
+    <li>Escape 键或点击空白处清除选中</li>
+  </ul>
+
+  <h3>连线系统</h3>
+  <div class="feature-card">
+    <h4>创建连线</h4>
+    <p>方式一：点击便签头部的连线按钮，进入连线模式，再点击目标便签完成。<br>
+    方式二：使用工具栏连线工具，依次点击源和目标。<br>
+    限制：不能自连、不能跨单元、不能重复连线。</p>
+  </div>
+  <div class="feature-card">
+    <h4>连线渲染</h4>
+    <p>使用 SVG 绘制，包含三层：发光层（高斯模糊滤镜）、主连线（可点击）、流动动画点（animateMotion 1.5 秒循环）。提供 8 种预设颜色（金、红、蓝、绿、紫、橙、鲜红、灰）。</p>
+  </div>
+  <div class="feature-card">
+    <h4>擦除连线</h4>
+    <p>进入橡皮擦模式后，点击连线即可删除。连线模式和橡皮擦模式互斥，工具栏显示当前模式指示器。</p>
+  </div>
+
+  <h3>右键上下文菜单</h3>
+  <p>便签上右键弹出菜单，包含以下操作：</p>
+  <ul>
+    <li>编辑 / 删除</li>
+    <li>标记已使用 / 取消已使用</li>
+    <li>发起连线</li>
+    <li><strong>复制到</strong>其他流程单元（含"当前单元"选项）</li>
+    <li><strong>转移到</strong>其他流程单元</li>
+    <li><strong>更改便签类型</strong>（智能处理数据转换：转遭遇/盲盒初始化骰子范围，转角色初始化角色数据）</li>
+  </ul>
+
+  <h3>鸟瞰图 / 小地图</h3>
+  <p>右下角 160x120 像素区域，绘制所有便签的缩略矩形和当前视口范围框。点击任意位置可跳转视口。每次视口变化或便签增删后自动刷新。</p>
+
+  <h3>缩略图概览</h3>
+  <p>全屏遮罩层以网格卡片形式展示所有流程单元，显示序号、标题、便签数量、描述摘要。当前单元高亮，点击跳转。</p>
+
+  <h3>撤回/恢复</h3>
+  <table>
+    <tr><th>支持的操作</th><th>快捷键</th></tr>
+    <tr><td>添加/删除便签（含关联连线数据）</td><td rowspan="6"><span class="tag tag-shortcut">Ctrl+Z</span> 撤回<br><span class="tag tag-shortcut">Ctrl+Y</span> 恢复</td></tr>
+    <tr><td>移动便签（记录新旧坐标）</td></tr>
+    <tr><td>编辑便签（记录新旧数据）</td></tr>
+    <tr><td>切换已使用/锁定状态</td></tr>
+    <tr><td>添加/删除连线</td></tr>
+    <tr><td>最多 50 步，新操作清空恢复栈</td></tr>
+  </table>
+
+  <h3>数据库面板联动</h3>
+  <ul>
+    <li>便签与数据库条目通过 <code>sourceEntryId</code> 关联</li>
+    <li>初始化时遍历所有便签重建已放置条目 ID 集合</li>
+    <li>切换流程单元时自动刷新数据库面板中条目的灰显状态</li>
+    <li>面板打开时画布区域自动收缩</li>
+  </ul>
+</section>
+
+<!-- ==================== 附录 ==================== -->
+<section id="shortcuts">
+  <h2>快捷键一览</h2>
+  <table>
+    <tr><th>快捷键</th><th>作用域</th><th>功能</th></tr>
+    <tr><td><code>Ctrl+B</code></td><td>编辑器</td><td>加粗</td></tr>
+    <tr><td><code>Ctrl+I</code></td><td>编辑器</td><td>斜体</td></tr>
+    <tr><td><code>Ctrl+U</code></td><td>编辑器</td><td>下划线</td></tr>
+    <tr><td><code>Ctrl+Z</code></td><td>编辑器 / 带团板</td><td>撤销</td></tr>
+    <tr><td><code>Ctrl+Y</code> / <code>Ctrl+Shift+Z</code></td><td>编辑器 / 带团板</td><td>重做</td></tr>
+    <tr><td><code>Ctrl+滚轮</code></td><td>带团板</td><td>缩放画布</td></tr>
+    <tr><td><code>滚轮</code></td><td>带团板</td><td>平移画布</td></tr>
+    <tr><td><code>Shift+滚轮</code></td><td>带团板</td><td>水平平移</td></tr>
+    <tr><td><code>空格+左键拖拽</code></td><td>带团板</td><td>平移画布</td></tr>
+    <tr><td><code>右键拖拽</code></td><td>带团板</td><td>平移画布</td></tr>
+    <tr><td><code>Delete / Backspace</code></td><td>带团板</td><td>批量删除选中便签</td></tr>
+    <tr><td><code>Escape</code></td><td>全局</td><td>关闭弹窗 / 清除选中 / 取消连线</td></tr>
+    <tr><td><code>左/右箭头</code></td><td>带团板</td><td>切换流程单元</td></tr>
+    <tr><td><code>Enter</code></td><td>创建对话框</td><td>快捷确认创建</td></tr>
+  </table>
+</section>
+
+<section id="db-types">
+  <h2>数据库类型一览</h2>
+  <table>
+    <tr><th>Key</th><th>名称</th><th>图标</th><th>便签渲染方式</th></tr>
+    <tr><td>characters</td><td>角色/怪物</td><td>用户</td><td>完整数据块（属性、战斗数据、特质、动作）</td></tr>
+    <tr><td>clues</td><td>线索/可互动物品</td><td>搜索</td><td>标题 + 内容文本</td></tr>
+    <tr><td>mainCG</td><td>主线 CG</td><td>旗帜</td><td>标题 + 内容文本</td></tr>
+    <tr><td>scenes</td><td>场景</td><td>地图</td><td>标题 + 内容文本</td></tr>
+    <tr><td>specialCG</td><td>特殊 CG</td><td>星</td><td>标题 + 内容文本</td></tr>
+    <tr><td>items</td><td>物品</td><td>礼物</td><td>标题 + 内容文本</td></tr>
+    <tr><td>encounters</td><td>随机遭遇</td><td>骰子</td><td>骰子范围列表（可折叠、可编辑）</td></tr>
+    <tr><td>other</td><td>其他事项</td><td>卷轴</td><td>标题 + 内容文本</td></tr>
+    <tr><td>endingCG</td><td>结局 CG</td><td>奖杯</td><td>标题 + 内容文本</td></tr>
+    <tr><td>rules</td><td>规则/机制</td><td>书</td><td>标题 + 内容文本</td></tr>
+    <tr><td>tasks</td><td>任务/目标</td><td>靶心</td><td>标题 + 内容文本</td></tr>
+    <tr><td>blindbox</td><td>盲盒</td><td>拼图</td><td>骰子范围列表（同遭遇）</td></tr>
+    <tr><td>loot</td><td>战利品</td><td>箱子</td><td>标题 + 内容文本</td></tr>
+    <tr><td>traps</td><td>陷阱</td><td>蜘蛛</td><td>标题 + 内容文本</td></tr>
+    <tr><td>background</td><td>背景知识</td><td>打开的书</td><td>标题 + 内容文本</td></tr>
+  </table>
+</section>
+
+<section id="icons">
+  <h2>图标系统</h2>
+  <p>应用使用内联 SVG Sprite 方案，所有图标定义在 <code>&lt;svg style="display:none"&gt;</code> 中的 <code>&lt;symbol&gt;</code> 元素里。通过 <code>&lt;use&gt;</code> 引用，支持 CSS 控制颜色和大小。</p>
+
+  <h3>图标尺寸变体</h3>
+  <table>
+    <tr><th>类名</th><th>尺寸</th><th>用途</th></tr>
+    <tr><td><code>.icon-sm</code></td><td>14px</td><td>按钮内小图标</td></tr>
+    <tr><td><code>.icon</code>（默认）</td><td>18px</td><td>常规图标</td></tr>
+    <tr><td><code>.icon-lg</code></td><td>22px</td><td>较大图标</td></tr>
+    <tr><td><code>.icon-xl</code></td><td>28px</td><td>特大图标（标题等）</td></tr>
+  </table>
+
+  <h3>可用图标列表</h3>
+  <table>
+    <tr><th>ID</th><th>描述</th><th>使用场景</th></tr>
+    <tr><td>i-castle</td><td>城堡</td><td>模组图标、品牌标识</td></tr>
+    <tr><td>i-dragon</td><td>龙</td><td>模组图标</td></tr>
+    <tr><td>i-sword</td><td>剑</td><td>模组图标</td></tr>
+    <tr><td>i-scroll</td><td>卷轴</td><td>模组图标、其他事项</td></tr>
+    <tr><td>i-map</td><td>地图</td><td>模组图标、场景</td></tr>
+    <tr><td>i-dice</td><td>骰子</td><td>模组图标、随机遭遇</td></tr>
+    <tr><td>i-shield</td><td>盾牌</td><td>模组图标</td></tr>
+    <tr><td>i-star</td><td>星星</td><td>模组图标、特殊 CG</td></tr>
+    <tr><td>i-user</td><td>用户</td><td>角色</td></tr>
+    <tr><td>i-skull</td><td>骷髅</td><td>危险标记</td></tr>
+    <tr><td>i-heart</td><td>心形</td><td>生命值相关</td></tr>
+    <tr><td>i-zap</td><td>闪电</td><td>先攻/速度</td></tr>
+    <tr><td>i-trophy</td><td>奖杯</td><td>结局 CG</td></tr>
+    <tr><td>i-pin</td><td>图钉</td><td>定位</td></tr>
+    <tr><td>i-chat</td><td>对话</td><td>对话/交流</td></tr>
+    <tr><td>i-alert</td><td>警告</td><td>警告提示</td></tr>
+    <tr><td>i-package</td><td>包裹</td><td>物品包</td></tr>
+    <tr><td>i-puzzle</td><td>拼图</td><td>盲盒</td></tr>
+    <tr><td>i-gift</td><td>礼物</td><td>物品</td></tr>
+    <tr><td>i-book</td><td>书</td><td>规则</td></tr>
+    <tr><td>i-book-open</td><td>打开的书</td><td>背景知识</td></tr>
+    <tr><td>i-box</td><td>箱子</td><td>战利品</td></tr>
+    <tr><td>i-spider</td><td>蜘蛛</td><td>陷阱</td></tr>
+    <tr><td>i-target</td><td>靶心</td><td>任务</td></tr>
+    <tr><td>i-flag</td><td>旗帜</td><td>主线 CG</td></tr>
+    <tr><td>i-search</td><td>搜索</td><td>查找</td></tr>
+    <tr><td>i-save</td><td>保存</td><td>保存操作</td></tr>
+    <tr><td>i-file</td><td>文件</td><td>文件操作</td></tr>
+    <tr><td>i-pdf</td><td>PDF</td><td>PDF 相关</td></tr>
+    <tr><td>i-folder</td><td>文件夹</td><td>目录操作</td></tr>
+    <tr><td>i-download</td><td>下载</td><td>导出</td></tr>
+    <tr><td>i-upload</td><td>上传</td><td>导入</td></tr>
+    <tr><td>i-link</td><td>链接</td><td>连线</td></tr>
+    <tr><td>i-lock</td><td>锁</td><td>锁定</td></tr>
+    <tr><td>i-image</td><td>图片</td><td>图片插入</td></tr>
+    <tr><td>i-undo</td><td>撤销</td><td>撤销操作</td></tr>
+    <tr><td>i-redo</td><td>重做</td><td>重做操作</td></tr>
+    <tr><td>i-clipboard</td><td>剪贴板</td><td>复制粘贴</td></tr>
+    <tr><td>i-trash</td><td>垃圾桶</td><td>删除</td></tr>
+    <tr><td>i-eraser</td><td>橡皮擦</td><td>连线擦除</td></tr>
+    <tr><td>i-bold / i-italic / i-underline</td><td>B/I/U</td><td>文本格式</td></tr>
+    <tr><td>i-heading</td><td>标题</td><td>标题层级</td></tr>
+    <tr><td>i-list</td><td>列表</td><td>有序/无序列表</td></tr>
+    <tr><td>i-quote</td><td>引用</td><td>引用块</td></tr>
+    <tr><td>i-check</td><td>勾选</td><td>确认</td></tr>
+    <tr><td>i-x</td><td>关闭</td><td>关闭/取消</td></tr>
+    <tr><td>i-plus / i-minus</td><td>加/减</td><td>新增/减少</td></tr>
+    <tr><td>i-chevron-r</td><td>右箭头</td><td>展开/导航</td></tr>
+    <tr><td>i-home</td><td>首页</td><td>返回首页</td></tr>
+    <tr><td>i-cog / i-settings</td><td>齿轮</td><td>设置</td></tr>
+    <tr><td>i-palette</td><td>调色板</td><td>颜色</td></tr>
+    <tr><td>i-indent / i-outdent</td><td>缩进</td><td>缩进控制</td></tr>
+    <tr><td>i-users</td><td>多用户</td><td>团队/群组</td></tr>
+    <tr><td>i-grid</td><td>网格</td><td>网格视图</td></tr>
+    <tr><td>i-scissors</td><td>剪刀</td><td>剪切</td></tr>
+    <tr><td>i-panel-left</td><td>左面板</td><td>侧边栏</td></tr>
+    <tr><td>i-info</td><td>信息</td><td>提示信息</td></tr>
+  </table>
+</section>
+
+<div style="text-align:center; padding:40px 0 0; color:var(--text-muted); font-size:13px; border-top:1px solid var(--border); margin-top:40px;">
+  备团助手 开发文档 &middot; 基于 Electron 项目源码分析生成 &middot; 2026-06-24
+</div>
+
+</main>
+</div>
+
+<!-- Sidebar scroll highlight -->
+<script>
+(function() {
+  const links = document.querySelectorAll('.sidebar nav a');
+  const sections = [];
+  links.forEach(a => {
+    const id = a.getAttribute('href')?.slice(1);
+    if (id) {
+      const el = document.getElementById(id);
+      if (el) sections.push({ el, a });
+    }
+  });
+  function onScroll() {
+    const scrollY = window.scrollY + 80;
+    let current = sections[0];
+    for (const s of sections) {
+      if (s.el.offsetTop <= scrollY) current = s;
+    }
+    links.forEach(a => a.classList.remove('active'));
+    if (current) current.a.classList.add('active');
+  }
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+})();
+</script>
+</body>
+</html>

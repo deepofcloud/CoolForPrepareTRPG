@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>连线系统原型 v5 - 备团助手</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Microsoft YaHei','PingFang SC',sans-serif; background:#1a1a2e; color:#e0d5c1; overflow:hidden; height:100vh; user-select:none; }
+  .toolbar { display:flex; align-items:center; gap:10px; padding:10px 16px; background:rgba(30,30,50,0.95); border-bottom:1px solid rgba(192,171,132,0.2); z-index:100; position:relative; }
+  .toolbar button { padding:6px 14px; border:1px solid rgba(192,171,132,0.4); background:rgba(192,171,132,0.1); color:#c0ab84; cursor:pointer; border-radius:4px; font-size:13px; transition:all 0.2s; }
+  .toolbar button:hover { background:rgba(192,171,132,0.25); }
+  .toolbar button.active { background:rgba(192,171,132,0.35); border-color:#c0ab84; box-shadow:0 0 8px rgba(192,171,132,0.3); }
+  .toolbar .hint { font-size:12px; color:#888; margin-left:8px; }
+  .canvas-wrap { position:relative; flex:1; overflow:hidden; background:radial-gradient(circle at 20% 30%,rgba(192,171,132,0.03) 0%,transparent 50%),radial-gradient(circle at 80% 70%,rgba(44,90,160,0.03) 0%,transparent 50%); }
+  .canvas { position:relative; width:1200px; height:800px; }
+  .note-card { position:absolute; width:130px; min-height:54px; background:rgba(40,40,65,0.9); border:1px solid rgba(192,171,132,0.35); border-radius:6px; padding:10px 12px; cursor:grab; display:flex; align-items:center; justify-content:center; font-size:14px; text-align:center; transition:border-color 0.2s,box-shadow 0.2s; }
+  .note-card:hover { border-color:rgba(192,171,132,0.7); box-shadow:0 0 12px rgba(192,171,132,0.15); }
+  .note-card.dragging { cursor:grabbing; z-index:50; box-shadow:0 4px 20px rgba(0,0,0,0.5); border-color:#c0ab84; }
+  .note-card.connect-source { border-color:#e6a817; box-shadow:0 0 16px rgba(230,168,23,0.4); animation:sourcePulse 1.2s ease-in-out infinite; }
+  .note-card.connect-target { cursor:crosshair; animation:targetPulse 0.8s ease-in-out infinite; }
+  @keyframes sourcePulse { 0%,100%{box-shadow:0 0 12px rgba(230,168,23,0.3)} 50%{box-shadow:0 0 22px rgba(230,168,23,0.6)} }
+  @keyframes targetPulse { 0%,100%{border-color:rgba(230,168,23,0.5)} 50%{border-color:rgba(230,168,23,1)} }
+
+  .connections-svg { position:absolute; top:0; left:0; width:100%; height:100%; pointer-events:none; z-index:10; }
+  .conn-group-item .conn-path-vis { fill:none; pointer-events:none; transition:opacity 0.2s; }
+  .conn-group-item:hover .conn-path-vis { opacity:0.85; filter:drop-shadow(0 0 6px currentColor); }
+  .conn-group-item.selected .conn-path-vis { opacity:1; filter:drop-shadow(0 0 10px currentColor); }
+  .conn-hit-area { fill:none; stroke:transparent; pointer-events:stroke; cursor:pointer; }
+  .waypoint-dot { pointer-events:all; cursor:grab; fill:#f0c040; stroke:#1a1a2e; stroke-width:2; display:none; transition:r 0.15s; }
+  .waypoint-dot.visible { display:block; } .waypoint-dot:hover { r:7; } .waypoint-dot.dragging { fill:#f5d060; r:8; cursor:grabbing; }
+  .endpoint-handle { pointer-events:all; cursor:grab; fill:#fff; stroke:#1a1a2e; stroke-width:2; display:none; transition:r 0.15s,fill 0.15s; }
+  .endpoint-handle.visible { display:block; } .endpoint-handle:hover { fill:#e0d5c1; r:7; } .endpoint-handle.dragging { fill:#c0ab84; r:8; cursor:grabbing; }
+
+  .property-panel { position:fixed; width:270px; background:rgba(30,30,50,0.96); border:1px solid rgba(192,171,132,0.4); border-radius:8px; z-index:200; display:none; box-shadow:0 8px 32px rgba(0,0,0,0.5); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .property-panel.visible { display:block; }
+  .panel-drag-handle { padding:10px 14px; font-size:14px; color:#c0ab84; border-bottom:1px solid rgba(192,171,132,0.2); cursor:grab; user-select:none; -webkit-user-select:none; }
+  .panel-drag-handle:active { cursor:grabbing; }
+  .panel-body { padding:10px 14px 14px; }
+  .prop-row { display:flex; align-items:center; margin-bottom:10px; gap:8px; }
+  .prop-label { font-size:12px; color:#999; width:36px; flex-shrink:0; }
+  .prop-row.type-row, .prop-row.arrow-row { flex-wrap:wrap; gap:4px; }
+  .prop-row.type-row .prop-label, .prop-row.arrow-row .prop-label { width:100%; margin-bottom:2px; }
+  .prop-row.size-row .prop-label { width:52px; }
+  .type-btn, .arrow-btn { padding:5px 8px; border:1px solid rgba(192,171,132,0.3); background:rgba(192,171,132,0.08); color:#aaa; cursor:pointer; border-radius:4px; font-size:15px; line-height:1; min-width:36px; text-align:center; transition:all 0.2s; }
+  .type-btn:hover, .arrow-btn:hover { background:rgba(192,171,132,0.2); color:#c0ab84; }
+  .type-btn.active, .arrow-btn.active { background:rgba(192,171,132,0.3); border-color:#c0ab84; color:#c0ab84; box-shadow:0 0 6px rgba(192,171,132,0.2); }
+  .arrow-btn.arrow-none { font-size:12px; }
+  .color-swatches { display:flex; gap:5px; flex-wrap:wrap; }
+  .color-swatch { width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid transparent; transition:all 0.15s; }
+  .color-swatch:hover { transform:scale(1.15); }
+  .color-swatch.active { border-color:#fff; box-shadow:0 0 6px currentColor; }
+  .prop-row input[type="range"] { flex:1; accent-color:#c0ab84; }
+  .style-btn { padding:4px 10px; border:1px solid rgba(192,171,132,0.3); background:rgba(192,171,132,0.08); color:#aaa; cursor:pointer; border-radius:4px; font-size:12px; transition:all 0.2s; }
+  .style-btn:hover { background:rgba(192,171,132,0.2); color:#c0ab84; }
+  .style-btn.active { background:rgba(192,171,132,0.3); border-color:#c0ab84; color:#c0ab84; }
+  .delete-btn { width:100%; padding:7px; background:rgba(200,50,50,0.2); border:1px solid rgba(200,50,50,0.4); color:#e07070; cursor:pointer; border-radius:4px; font-size:13px; margin-top:4px; transition:all 0.2s; }
+  .delete-btn:hover { background:rgba(200,50,50,0.35); }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <button id="btnConnect" onclick="toggleConnectMode()">连线模式</button>
+  <button id="btnClear" onclick="clearSelection()">取消选中</button>
+  <button id="btnReset" onclick="resetDemo()">重置演示</button>
+  <span class="hint" id="hintText">点击连线查看属性 | 面板可拖动标题栏 | 拖拽便签</span>
+</div>
+
+<div class="canvas-wrap" id="canvasWrap">
+  <div class="canvas" id="canvas"></div>
+</div>
+
+<div class="property-panel" id="propertyPanel">
+  <div class="panel-drag-handle" id="panelDragHandle">连线属性</div>
+  <div class="panel-body">
+    <div class="prop-row type-row">
+      <div class="prop-label">线型</div>
+      <button class="type-btn active" data-type="straight" onclick="setLineType('straight')" title="直线">═</button>
+      <button class="type-btn" data-type="curved" onclick="setLineType('curved')" title="曲线">╱</button>
+      <button class="type-btn" data-type="orthogonal" onclick="setLineType('orthogonal')" title="直角线">└</button>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">颜色</span>
+      <div class="color-swatches" id="colorSwatches"></div>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">线宽</span>
+      <input type="range" min="1" max="6" value="2" id="lineWidthSlider" oninput="setLineWidth(this.value)">
+      <span style="font-size:11px;color:#888;min-width:24px;" id="lineWidthVal">2px</span>
+    </div>
+    <div class="prop-row size-row">
+      <span class="prop-label">箭头大小</span>
+      <input type="range" min="4" max="20" value="8" id="arrowSizeSlider" oninput="setArrowSize(this.value)">
+      <span style="font-size:11px;color:#888;min-width:26px;" id="arrowSizeVal">8px</span>
+    </div>
+    <div class="prop-row">
+      <span class="prop-label">样式</span>
+      <button class="style-btn active" data-style="solid" onclick="setLineStyle('solid')">━ 实线</button>
+      <button class="style-btn" data-style="dashed" onclick="setLineStyle('dashed')">┅ 虚线</button>
+      <button class="style-btn" data-style="dotted" onclick="setLineStyle('dotted')">⋯ 点线</button>
+    </div>
+    <div class="prop-row arrow-row">
+      <div class="prop-label">起点</div>
+      <button class="arrow-btn arrow-none active" data-arrow="none" onclick="setArrow('start','none')" title="无">⊘</button>
+      <button class="arrow-btn" data-arrow="triangle" onclick="setArrow('start','triangle')" title="实心三角">▶</button>
+      <button class="arrow-btn" data-arrow="triangle-open" onclick="setArrow('start','triangle-open')" title="空心三角">▷</button>
+      <button class="arrow-btn" data-arrow="diamond" onclick="setArrow('start','diamond')" title="菱形">◆</button>
+      <button class="arrow-btn" data-arrow="dot" onclick="setArrow('start','dot')" title="圆点">●</button>
+    </div>
+    <div class="prop-row arrow-row">
+      <div class="prop-label">终点</div>
+      <button class="arrow-btn arrow-none active" data-arrow="none" onclick="setArrow('end','none')" title="无">⊘</button>
+      <button class="arrow-btn" data-arrow="triangle" onclick="setArrow('end','triangle')" title="实心三角">▶</button>
+      <button class="arrow-btn" data-arrow="triangle-open" onclick="setArrow('end','triangle-open')" title="空心三角">▷</button>
+      <button class="arrow-btn" data-arrow="diamond" onclick="setArrow('end','diamond')" title="菱形">◆</button>
+      <button class="arrow-btn" data-arrow="dot" onclick="setArrow('end','dot')" title="圆点">●</button>
+    </div>
+    <button class="delete-btn" onclick="deleteSelectedConnection()">删除连线</button>
+  </div>
+</div>
+
+<script>
+const COLORS = ['#c0ab84','#a03030','#2c5aa0','#27864a','#9b59b6','#e67e22','#e74c3c','#7f8c8d'];
+const NOTE_W = 130, NOTE_H = 54, HIT_AREA_WIDTH = 14;
+
+const ARROW_TYPES = {
+  'triangle':      { create:(s,c,isS)=>({ shape:'polygon', attrs:{ points:isS?`${s},0 0,${s/2} ${s},${s}`:`0,0 ${s},${s/2} 0,${s}`, fill:c } }), refX:s=>s*0.8 },
+  'triangle-open': { create:(s,c,isS)=>({ shape:'polygon', attrs:{ points:isS?`${s},0 0,${s/2} ${s},${s}`:`0,0 ${s},${s/2} 0,${s}`, fill:'none', stroke:c, 'stroke-width':Math.max(1,s*0.15) } }), refX:s=>s*0.8 },
+  'diamond':       { create:(s,c)=>({ shape:'polygon', attrs:{ points:`${s/2},0 ${s},${s/2} ${s/2},${s} 0,${s/2}`, fill:c } }), refX:s=>s*0.8 },
+  'dot':           { create:(s,c)=>({ shape:'circle', attrs:{ cx:s/2, cy:s/2, r:Math.max(2,s*0.28), fill:c } }), refX:s=>s*0.55 },
+};
+
+let notes = [
+  { id:'n1', x:120, y:220, label:'起始场景' }, { id:'n2', x:420, y:70, label:'关键角色' },
+  { id:'n3', x:420, y:370, label:'重要线索' }, { id:'n4', x:720, y:70, label:'BOSS怪物' }, { id:'n5', x:720, y:370, label:'传说物品' },
+];
+
+let connections = makeConns([
+  ['c1','n1','n2','#c0ab84','straight',   2,'solid', 'none',    'none'],
+  ['c2','n1','n3','#2c5aa0','curved',     2,'solid', 'none',    'none'],
+  ['c3','n2','n4','#27864a','orthogonal', 2,'solid', 'dot',     'none'],
+  ['c4','n3','n5','#9b59b6','curved',     1,'dotted','none',    'diamond'],
+  ['c5','n4','n5','#e67e22','curved',     2,'dashed','none',    'triangle', 16],
+]);
+
+function makeConns(arrs) {
+  return arrs.map(([id,from,to,color,lt,lw,ls,sa,ea,as])=>({ id,from,to,color,lineType:lt,lineWidth:lw,lineStyle:ls,startArrow:sa,endArrow:ea,waypoints:[],fromAnchor:null,toAnchor:null,arrowSize:as||8 }));
+}
+
+let connIdCounter = 6, selectedConnId = null;
+let modeConnect = false, connectSourceId = null;
+let draggingNote = null, dragOffset = { x:0, y:0 };
+let draggingWaypoint = null, draggingEndpoint = null;
+let draggingPanel = false, panelDragOffset = { x:0, y:0 };
+
+function noteCenter(n) { return { x:n.x+NOTE_W/2, y:n.y+NOTE_H/2 }; }
+
+// ===================================================================
+// 边缘锚定
+// ===================================================================
+function lineRectIntersection(fromPt, toPt, l, t, r, b) {
+  const dx=toPt.x-fromPt.x, dy=toPt.y-fromPt.y; if (dx===0&&dy===0) return null;
+  let tMin=Infinity, best=null;
+  if (dx!==0) { let te=(l-fromPt.x)/dx, y=fromPt.y+te*dy; if(te>=0&&y>=t&&y<=b&&te<tMin){tMin=te;best={x:l,y};} te=(r-fromPt.x)/dx; y=fromPt.y+te*dy; if(te>=0&&y>=t&&y<=b&&te<tMin){tMin=te;best={x:r,y};} }
+  if (dy!==0) { let te=(t-fromPt.y)/dy, x=fromPt.x+te*dx; if(te>=0&&x>=l&&x<=r&&te<tMin){tMin=te;best={x,y:t};} te=(b-fromPt.y)/dy; x=fromPt.x+te*dx; if(te>=0&&x>=l&&x<=r&&te<tMin){tMin=te;best={x,y:b};} }
+  return best;
+}
+function anchorToPoint(note, anchor) {
+  if (!anchor) return noteCenter(note);
+  const l=note.x,r=note.x+NOTE_W,t=note.y,b=note.y+NOTE_H;
+  switch(anchor.side){ case 'top':return{x:l+NOTE_W*anchor.offset,y:t}; case 'bottom':return{x:l+NOTE_W*anchor.offset,y:b}; case 'left':return{x:l,y:t+NOTE_H*anchor.offset}; case 'right':return{x:r,y:t+NOTE_H*anchor.offset}; default:return noteCenter(note); }
+}
+function calcEdgePoint(note, anchor, otherCenter) {
+  if (anchor) return anchorToPoint(note,anchor);
+  const cx=note.x+NOTE_W/2, cy=note.y+NOTE_H/2;
+  return lineRectIntersection({x:cx,y:cy},otherCenter,note.x,note.y,note.x+NOTE_W,note.y+NOTE_H)||{x:cx,y:cy};
+}
+function snapToCardEdge(px,py,note) {
+  const l=note.x,r=note.x+NOTE_W,t=note.y,b=note.y+NOTE_H;
+  const d=[Math.abs(py-t),Math.abs(py-b),Math.abs(px-l),Math.abs(px-r)], m=Math.min(...d);
+  if(m===d[0]){const o=Math.max(0,Math.min(1,(px-l)/NOTE_W));return{side:'top',offset:o,x:l+NOTE_W*o,y:t};}
+  if(m===d[1]){const o=Math.max(0,Math.min(1,(px-l)/NOTE_W));return{side:'bottom',offset:o,x:l+NOTE_W*o,y:b};}
+  if(m===d[2]){const o=Math.max(0,Math.min(1,(py-t)/NOTE_H));return{side:'left',offset:o,x:l,y:t+NOTE_H*o};}
+  const o=Math.max(0,Math.min(1,(py-t)/NOTE_H));return{side:'right',offset:o,x:r,y:t+NOTE_H*o};
+}
+
+// ===================================================================
+// 路径
+// ===================================================================
+function calcStraightPath(c1,c2){return{d:`M ${c1.x} ${c1.y} L ${c2.x} ${c2.y}`,waypoints:[]};}
+function calcCurvedPath(c1,c2,conn){
+  if(conn.waypoints&&conn.waypoints.length>=2){const cp1=conn.waypoints[0],cp2=conn.waypoints[1];return{d:`M ${c1.x} ${c1.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${c2.x} ${c2.y}`,waypoints:[cp1,cp2]};}
+  const dx=c2.x-c1.x,dy=c2.y-c1.y,dist=Math.sqrt(dx*dx+dy*dy),off=Math.min(dist*0.35,150);
+  const cp1={x:c1.x+dx*0.3,y:c1.y+dy*0.3+(Math.abs(dx)>Math.abs(dy)?off*0.5:0)},cp2={x:c2.x-dx*0.3,y:c2.y-dy*0.3-(Math.abs(dx)>Math.abs(dy)?off*0.5:0)};
+  return{d:`M ${c1.x} ${c1.y} C ${cp1.x} ${cp1.y}, ${cp2.x} ${cp2.y}, ${c2.x} ${c2.y}`,waypoints:[cp1,cp2]};
+}
+function calcOrthogonalPath(c1,c2,conn){
+  if(conn.waypoints&&conn.waypoints.length>=1){const pts=[c1,...conn.waypoints,c2];return{d:pts.map((p,i)=>i===0?`M ${p.x} ${p.y}`:`L ${p.x} ${p.y}`).join(' '),waypoints:conn.waypoints};}
+  const dx=c2.x-c1.x,dy=c2.y-c1.y;let mid1,mid2;
+  if(Math.abs(dx)>Math.abs(dy)){const mx=c1.x+dx*0.5;mid1={x:mx,y:c1.y};mid2={x:mx,y:c2.y};}
+  else{const my=c1.y+dy*0.5;mid1={x:c1.x,y:my};mid2={x:c2.x,y:my};}
+  return{d:`M ${c1.x} ${c1.y} L ${mid1.x} ${mid1.y} L ${mid2.x} ${mid2.y} L ${c2.x} ${c2.y}`,waypoints:[mid1,mid2]};
+}
+function calcConnectionPath(conn){
+  const fN=notes.find(n=>n.id===conn.from),tN=notes.find(n=>n.id===conn.to); if(!fN||!tN)return{d:'',waypoints:[]};
+  const fc=noteCenter(fN),tc=noteCenter(tN),c1=calcEdgePoint(fN,conn.fromAnchor,tc),c2=calcEdgePoint(tN,conn.toAnchor,fc);
+  switch(conn.lineType){case'straight':return calcStraightPath(c1,c2);case'curved':return calcCurvedPath(c1,c2,conn);case'orthogonal':return calcOrthogonalPath(c1,c2,conn);default:return calcStraightPath(c1,c2);}
+}
+
+// ===================================================================
+// 渲染
+// ===================================================================
+function docNS(tag,attrs){const el=document.createElementNS('http://www.w3.org/2000/svg',tag);if(attrs)Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,v));return el;}
+function renderNotes(){
+  const c=document.getElementById('canvas');c.querySelectorAll('.note-card').forEach(e=>e.remove());
+  notes.forEach(n=>{const el=document.createElement('div');el.className='note-card';el.id='note-'+n.id;el.dataset.noteId=n.id;el.style.left=n.x+'px';el.style.top=n.y+'px';el.textContent=n.label;el.addEventListener('mousedown',e=>onNoteMouseDown(e,n));c.appendChild(el);});
+  updateConnectModeStyles();
+}
+function renderArrowDefs(){
+  const svg=document.getElementById('connectionsSvg');if(!svg)return;
+  const oldDefs=svg.querySelector('defs');if(oldDefs)oldDefs.remove();
+  const defs=docNS('defs');
+  connections.forEach(conn=>{
+    const s=Math.max(4,conn.arrowSize||8); // 使用独立箭头大小
+    ['start','end'].forEach(pos=>{
+      const type=pos==='start'?conn.startArrow:conn.endArrow; if(!type||type==='none')return;
+      const tdef=ARROW_TYPES[type];if(!tdef)return;
+      const{shape,attrs}=tdef.create(s,conn.color,pos==='start');
+      const marker=docNS('marker',{id:`arrow-${conn.id}-${pos}`,markerWidth:s+2,markerHeight:s,refX:tdef.refX(s),refY:s/2,orient:'auto',markerUnits:'userSpaceOnUse'});
+      marker.appendChild(docNS(shape,attrs));defs.appendChild(marker);
+    });
+  });
+  svg.insertBefore(defs,svg.firstChild);
+}
+function renderConnections(){
+  const svg=document.getElementById('connectionsSvg');if(!svg)return;
+  svg.querySelectorAll('g.conn-group, g.waypoint-group, g.endpoint-group').forEach(g=>g.remove());
+  const connG=docNS('g',{class:'conn-group'}),wpG=docNS('g',{class:'waypoint-group'}),epG=docNS('g',{class:'endpoint-group'});
+  connections.forEach(conn=>{
+    const pd=calcConnectionPath(conn);if(!pd.d)return;
+    const fN=notes.find(n=>n.id===conn.from),tN=notes.find(n=>n.id===conn.to);if(!fN||!tN)return;
+    const isSelected=conn.id===selectedConnId;
+    const group=docNS('g',{class:'conn-group-item'+(isSelected?' selected':''),'data-conn-id':conn.id});
+    const visPath=docNS('path',{d:pd.d,stroke:conn.color,'stroke-width':conn.lineWidth,fill:'none',class:'conn-path-vis'});
+    if(conn.lineStyle==='dashed')visPath.setAttribute('stroke-dasharray',`${8*conn.lineWidth} ${4*conn.lineWidth}`);
+    else if(conn.lineStyle==='dotted'){visPath.setAttribute('stroke-dasharray',`${2*conn.lineWidth} ${4*conn.lineWidth}`);visPath.setAttribute('stroke-linecap','round');}
+    if(conn.endArrow&&conn.endArrow!=='none')visPath.setAttribute('marker-end',`url(#arrow-${conn.id}-end)`);
+    if(conn.startArrow&&conn.startArrow!=='none')visPath.setAttribute('marker-start',`url(#arrow-${conn.id}-start)`);
+    group.appendChild(visPath);
+    const hitPath=docNS('path',{d:pd.d,stroke:'transparent','stroke-width':HIT_AREA_WIDTH,fill:'none',class:'conn-hit-area'});
+    hitPath.addEventListener('click',e=>{e.stopPropagation();onConnectionClick(conn.id);});
+    group.appendChild(hitPath);connG.appendChild(group);
+    if(isSelected&&pd.waypoints&&pd.waypoints.length>0){pd.waypoints.forEach((wp,i)=>{const dot=docNS('circle',{cx:wp.x,cy:wp.y,r:'5',class:'waypoint-dot visible','data-conn-id':conn.id,'data-wp-index':i});dot.addEventListener('mousedown',e=>{e.stopPropagation();onWaypointMouseDown(e,conn.id,i);});wpG.appendChild(dot);});}
+    if(isSelected){const fc=noteCenter(fN),tc=noteCenter(tN),epF=calcEdgePoint(fN,conn.fromAnchor,tc),epT=calcEdgePoint(tN,conn.toAnchor,fc);[{pt:epF,end:'from'},{pt:epT,end:'to'}].forEach(({pt,end})=>{const h=docNS('circle',{cx:pt.x,cy:pt.y,r:'6',class:'endpoint-handle visible','data-conn-id':conn.id,'data-end':end});h.addEventListener('mousedown',e=>{e.stopPropagation();onEndpointMouseDown(e,conn.id,end);});epG.appendChild(h);});}
+  });
+  svg.appendChild(connG);svg.appendChild(wpG);svg.appendChild(epG);
+}
+function renderAll(){renderArrowDefs();renderNotes();renderConnections();if(selectedConnId)renderPropertyPanel();}
+
+// ===================================================================
+// 属性面板
+// ===================================================================
+function initColorSwatches(){const c=document.getElementById('colorSwatches');COLORS.forEach(cl=>{const sw=document.createElement('div');sw.className='color-swatch';sw.style.backgroundColor=cl;sw.title=cl;sw.onclick=()=>setColor(cl);c.appendChild(sw);});}
+function renderPropertyPanel(){
+  if(!selectedConnId){document.getElementById('propertyPanel').classList.remove('visible');return;}
+  const conn=getSelectedConn();if(!conn)return;
+  const p=document.getElementById('propertyPanel');p.classList.add('visible');
+  p.querySelectorAll('.type-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===conn.lineType));
+  p.querySelectorAll('.color-swatch').forEach(sw=>sw.classList.toggle('active',sw.style.backgroundColor===conn.color||rgbToHex(sw.style.backgroundColor)===conn.color));
+  document.getElementById('lineWidthSlider').value=conn.lineWidth;document.getElementById('lineWidthVal').textContent=conn.lineWidth+'px';
+  document.getElementById('arrowSizeSlider').value=conn.arrowSize||8;document.getElementById('arrowSizeVal').textContent=(conn.arrowSize||8)+'px';
+  p.querySelectorAll('.style-btn').forEach(b=>b.classList.toggle('active',b.dataset.style===conn.lineStyle));
+  p.querySelectorAll('.prop-row.arrow-row').forEach(row=>{const isStart=row.querySelector('.prop-label').textContent.trim()==='起点';const val=isStart?conn.startArrow:conn.endArrow;row.querySelectorAll('.arrow-btn').forEach(b=>b.classList.toggle('active',b.dataset.arrow===val));});
+}
+function rgbToHex(rgb){if(!rgb||!rgb.startsWith('rgb'))return rgb;const m=rgb.match(/\d+/g);if(!m)return rgb;return'#'+m.map(x=>parseInt(x).toString(16).padStart(2,'0')).join('');}
+
+// ===================================================================
+// 交互
+// ===================================================================
+function onNoteMouseDown(e,note){
+  if(e.button!==0)return;
+  if(modeConnect){if(!connectSourceId){connectSourceId=note.id;updateConnectModeStyles();document.getElementById('hintText').textContent='已选择起点，请点击目标便签（右键取消）';}else if(note.id!==connectSourceId)completeConnection(note.id);return;}
+  draggingNote=note;dragOffset={x:e.clientX-note.x,y:e.clientY-note.y};const el=document.getElementById('note-'+note.id);if(el)el.classList.add('dragging');e.preventDefault();
+}
+document.addEventListener('mousemove',e=>{
+  const r=document.getElementById('canvasWrap').getBoundingClientRect();
+  if(draggingNote){draggingNote.x=e.clientX-dragOffset.x-r.left;draggingNote.y=e.clientY-dragOffset.y-r.top;renderAll();}
+  if(draggingWaypoint){const conn=connections.find(c=>c.id===draggingWaypoint.connId);if(!conn)return;conn.waypoints[draggingWaypoint.wpIndex]={x:e.clientX-r.left,y:e.clientY-r.top};renderAll();}
+  if(draggingEndpoint){const conn=connections.find(c=>c.id===draggingEndpoint.connId);if(!conn)return;const cx=e.clientX-r.left,cy=e.clientY-r.top,tn=draggingEndpoint.end==='from'?notes.find(n=>n.id===conn.from):notes.find(n=>n.id===conn.to);if(!tn)return;const sn=snapToCardEdge(cx,cy,tn);if(draggingEndpoint.end==='from')conn.fromAnchor={side:sn.side,offset:sn.offset};else conn.toAnchor={side:sn.side,offset:sn.offset};renderAll();}
+  if(draggingPanel){const p=document.getElementById('propertyPanel');p.style.left=(e.clientX-panelDragOffset.x)+'px';p.style.top=(e.clientY-panelDragOffset.y)+'px';}
+});
+document.addEventListener('mouseup',()=>{if(draggingNote){const el=document.getElementById('note-'+draggingNote.id);if(el)el.classList.remove('dragging');draggingNote=null;}draggingWaypoint=null;draggingEndpoint=null;draggingPanel=false;});
+document.addEventListener('contextmenu',e=>{if(modeConnect&&connectSourceId){e.preventDefault();connectSourceId=null;updateConnectModeStyles();document.getElementById('hintText').textContent='连线模式：点击便签选择起点';}});
+
+function toggleConnectMode(){modeConnect=!modeConnect;connectSourceId=null;const btn=document.getElementById('btnConnect'),h=document.getElementById('hintText');if(modeConnect){btn.classList.add('active');btn.textContent='退出连线';h.textContent='连线模式：点击便签选择起点（右键取消）';clearSelection();}else{btn.classList.remove('active');btn.textContent='连线模式';h.textContent='点击连线查看属性 | 面板可拖动标题栏 | 拖拽便签';}updateConnectModeStyles();}
+function updateConnectModeStyles(){document.querySelectorAll('.note-card').forEach(el=>el.classList.remove('connect-source','connect-target'));if(modeConnect&&connectSourceId){const se=document.getElementById('note-'+connectSourceId);if(se)se.classList.add('connect-source');document.querySelectorAll('.note-card').forEach(el=>{if(el.dataset.noteId!==connectSourceId)el.classList.add('connect-target');});}}
+function completeConnection(tid){const from=connectSourceId,to=tid;if(connections.some(c=>(c.from===from&&c.to===to)||(c.from===to&&c.to===from))){document.getElementById('hintText').textContent='连线已存在！（右键取消）';return;}connections.push({id:'c'+(connIdCounter++),from,to,color:COLORS[0],lineType:'straight',lineWidth:2,lineStyle:'solid',startArrow:'none',endArrow:'none',waypoints:[],fromAnchor:null,toAnchor:null,arrowSize:8});connectSourceId=null;document.getElementById('hintText').textContent='连线已创建！继续选择起点（右键取消）';updateConnectModeStyles();renderAll();}
+
+function onConnectionClick(cid){if(modeConnect)return;selectedConnId=cid;renderAll();positionPropertyPanel(cid);}
+function clearSelection(){selectedConnId=null;document.getElementById('propertyPanel').classList.remove('visible');renderAll();}
+function positionPropertyPanel(cid){const conn=connections.find(c=>c.id===cid);if(!conn)return;const fN=notes.find(n=>n.id===conn.from),tN=notes.find(n=>n.id===conn.to);if(!fN||!tN)return;const fc=noteCenter(fN),tc=noteCenter(tN),mx=(fc.x+tc.x)/2,my=(fc.y+tc.y)/2,p=document.getElementById('propertyPanel'),pw=p.offsetWidth||270,ph=p.offsetHeight||360,wr=document.getElementById('canvasWrap').getBoundingClientRect();let px=(mx<wr.width/2)?mx+40:mx-pw-40,py=(my<wr.height/2)?my+30:my-ph-30;px=Math.max(10,Math.min(wr.width-pw-10,px));py=Math.max(10,Math.min(wr.height-ph-10,py));p.style.left=(wr.left+px)+'px';p.style.top=(wr.top+py)+'px';p.classList.add('visible');}
+document.getElementById('panelDragHandle').addEventListener('mousedown',e=>{if(e.button!==0)return;draggingPanel=true;const p=document.getElementById('propertyPanel'),rect=p.getBoundingClientRect();panelDragOffset={x:e.clientX-rect.left,y:e.clientY-rect.top};e.preventDefault();});
+
+// ===================================================================
+// 属性操作
+// ===================================================================
+function getSelectedConn(){return connections.find(c=>c.id===selectedConnId);}
+function setLineType(t){const c=getSelectedConn();if(!c)return;c.lineType=t;c.waypoints=[];renderAll();}
+function setColor(cl){const c=getSelectedConn();if(!c)return;c.color=cl;renderAll();}
+function setLineWidth(v){const c=getSelectedConn();if(!c)return;c.lineWidth=parseInt(v);document.getElementById('lineWidthVal').textContent=v+'px';renderAll();}
+function setArrowSize(v){const c=getSelectedConn();if(!c)return;c.arrowSize=parseInt(v);document.getElementById('arrowSizeVal').textContent=v+'px';renderAll();}
+function setLineStyle(s){const c=getSelectedConn();if(!c)return;c.lineStyle=s;renderAll();}
+function setArrow(pos,type){const c=getSelectedConn();if(!c)return;if(pos==='start')c.startArrow=type;else c.endArrow=type;renderAll();}
+function deleteSelectedConnection(){if(!selectedConnId)return;connections=connections.filter(c=>c.id!==selectedConnId);selectedConnId=null;document.getElementById('propertyPanel').classList.remove('visible');renderAll();}
+function onWaypointMouseDown(e,cid,wi){if(e.button!==0)return;const conn=connections.find(c=>c.id===cid);if(!conn)return;if(!conn.waypoints||conn.waypoints.length===0){const pd=calcConnectionPath(conn);if(pd.waypoints&&pd.waypoints.length>0)conn.waypoints=pd.waypoints.map(w=>({x:w.x,y:w.y}));}draggingWaypoint={connId:cid,wpIndex:wi};e.preventDefault();e.stopPropagation();}
+function onEndpointMouseDown(e,cid,end){if(e.button!==0)return;draggingEndpoint={connId:cid,end};e.preventDefault();e.stopPropagation();}
+document.getElementById('canvasWrap').addEventListener('mousedown',function(e){if(e.target===this||e.target.id==='canvas'||e.target.classList.contains('connections-svg'))clearSelection();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')modeConnect?toggleConnectMode():clearSelection();});
+
+// ===================================================================
+// 重置 & 初始化
+// ===================================================================
+function resetDemo(){modeConnect=false;connectSourceId=null;selectedConnId=null;draggingNote=null;draggingWaypoint=null;draggingEndpoint=null;draggingPanel=false;document.getElementById('btnConnect').classList.remove('active');document.getElementById('btnConnect').textContent='连线模式';document.getElementById('hintText').textContent='点击连线查看属性 | 面板可拖动标题栏 | 拖拽便签';document.getElementById('propertyPanel').classList.remove('visible');notes=[{id:'n1',x:120,y:220,label:'起始场景'},{id:'n2',x:420,y:70,label:'关键角色'},{id:'n3',x:420,y:370,label:'重要线索'},{id:'n4',x:720,y:70,label:'BOSS怪物'},{id:'n5',x:720,y:370,label:'传说物品'}];connections=makeConns([['c1','n1','n2','#c0ab84','straight',2,'solid','none','none'],['c2','n1','n3','#2c5aa0','curved',2,'solid','none','none'],['c3','n2','n4','#27864a','orthogonal',2,'solid','dot','none'],['c4','n3','n5','#9b59b6','curved',1,'dotted','none','diamond'],['c5','n4','n5','#e67e22','curved',2,'dashed','none','triangle',16],]);connIdCounter=6;const oldSvg=document.getElementById('connectionsSvg');if(oldSvg)oldSvg.remove();createSvgLayer();renderAll();}
+function createSvgLayer(){const c=document.getElementById('canvas');c.appendChild(docNS('svg',{id:'connectionsSvg',class:'connections-svg',width:'100%',height:'100%'}));}
+initColorSwatches();createSvgLayer();renderAll();
+</script>
+</body>
+</html>

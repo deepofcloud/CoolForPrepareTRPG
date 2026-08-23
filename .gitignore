@@ -1,0 +1,49 @@
+node_modules/
+
+# Build output
+electron-app/dist/
+electron-app/dist_*/
+electron-app/dist_new/
+
+# IDE & Editor
+.trae-html-share-packages/
+.vscode/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Local backups & dev archives
+开发环境备份/
+backup_*.bundle
+*.bak
+debug.log
+
+# Third-party rulebook content (copyrighted, not for redistribution)
+规则书/
+规则书/**/*.zip
+
+# Design assets
+*.psd
+
+# Private prototypes / misc
+V0.81
+/.git_backup_20260823/
+
+# Release copies & media files (too large for git)
+御备团0.81版本/
+历史版本/
+视频/
+*.mp4
+*.avi
+*.aac
+*.exe
+*.blockmap
+*.baiduyun.uploading.cfg
+
+# Personal module scripts (private content)
+王之残褛序幕及第一章.json
+测试用模组存档位置/
+
+# Third-party character sheet (copyrighted)
+*.xlsx

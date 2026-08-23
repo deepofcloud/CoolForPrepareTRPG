@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>御备团</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #1a1a2e;
+    color: #e0d8c8;
+  }
+
+  /* 分屏容器 */
+  #splitContainer {
+    display: flex;
+    position: absolute;
+    top: 52px;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  }
+
+  /* iframe 面板 */
+  .split-panel {
+    flex: 0 0 auto;
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .split-panel iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    display: block;
+  }
+
+  /* 左侧文档编辑器 */
+  #leftPanel {
+    flex: 1 1 auto;
+    min-width: 200px;
+  }
+
+  /* 右侧带团板 */
+  #rightPanel {
+    flex: 1 1 auto;
+    min-width: 200px;
+  }
+
+  /* 分割条 */
+  #splitDivider {
+    flex: 0 0 4px;
+    cursor: col-resize;
+    background: #3a3a5a;
+    position: relative;
+    z-index: 100;
+    transition: background 0.2s;
+  }
+
+  #splitDivider:hover,
+  #splitDivider.dragging {
+    background: #6366f1;
+  }
+
+  #splitDivider::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 2px;
+    height: 40px;
+    background: #6b7280;
+    border-radius: 1px;
+  }
+
+  /* 顶部工具栏（分屏模式） */
+  #splitToolbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 52px;
+    background: rgba(26, 26, 46, 0.95);
+    border-bottom: 1px solid #3a3a5a;
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    z-index: 200;
+    -webkit-app-region: drag;
+  }
+
+  #splitToolbar .spacer { flex: 1; }
+
+  #splitToolbar button {
+    -webkit-app-region: no-drag;
+    background: #3a3a5a;
+    color: #e0d8c8;
+    border: 1px solid #4a4a6a;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    margin-left: 8px;
+    transition: all 0.2s;
+  }
+
+  #splitToolbar button:hover {
+    background: #4a4a7a;
+    border-color: #6366f1;
+  }
+
+  #splitToolbar .title {
+    font-size: 13px;
+    font-weight: 600;
+    color: #a0a0c0;
+  }
+
+  #splitToolbar .save-status {
+    font-size: 11px;
+    color: #5a5a7a;
+    margin-left: 12px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    min-width: 56px;
+    height: 22px;
+    line-height: 18px;
+    text-align: center;
+    display: inline-block;
+    background: rgba(90, 90, 122, 0.1);
+    transition: all 0.3s ease;
+  }
+
+  #splitToolbar .save-status.saved {
+    color: #d1fae5;
+    background: rgba(52, 211, 153, 0.15);
+  }
+
+  #splitToolbar .save-status.saving {
+    color: #fef3c7;
+    background: rgba(251, 191, 36, 0.15);
+  }
+
+  /* 内容区域 */
+</style>
+</head>
+<body>
+  <div id="splitToolbar">
+    <span class="title">分屏模式</span>
+    <span id="saveStatus" class="save-status"></span>
+    <div class="spacer"></div>
+    <button id="btnExitSplit">退出分屏</button>
+  </div>
+
+  <div id="splitContainer">
+    <div id="leftPanel" class="split-panel">
+      <iframe id="docIframe" src="doc-editor.html"></iframe>
+    </div>
+    <div id="splitDivider"></div>
+    <div id="rightPanel" class="split-panel">
+      <iframe id="boardIframe" src="board.html"></iframe>
+    </div>
+  </div>
+
+<script>
+  /* ========== 分屏壳控制器 ========== */
+  const SplitShell = {
+    _isDragging: false,
+    _startX: 0,
+    _startLeftWidth: 0,
+    _currentModuleId: null,
+    _flushDebounceTimer: null,
+
+    init() {
+      const divider = document.getElementById('splitDivider');
+      const container = document.getElementById('splitContainer');
+      const leftPanel = document.getElementById('leftPanel');
+
+      // 分割条拖拽 - 使用 PointerEvent + setPointerCapture 防止被 iframe 拦截
+      divider.addEventListener('pointerdown', (e) => {
+        this._isDragging = true;
+        this._startX = e.clientX;
+        this._startLeftWidth = leftPanel.offsetWidth;
+        divider.classList.add('dragging');
+        document.body.style.cursor = 'col-resize';
+        divider.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      divider.addEventListener('pointermove', (e) => {
+        if (!this._isDragging) return;
+        const containerWidth = container.clientWidth;
+        const dividerWidth = 4;
+        const minWidth = 200;
+        let newLeftWidth = this._startLeftWidth + (e.clientX - this._startX);
+        newLeftWidth = Math.max(minWidth, Math.min(containerWidth - dividerWidth - minWidth, newLeftWidth));
+        leftPanel.style.flex = `0 0 ${newLeftWidth}px`;
+      });
+
+      divider.addEventListener('pointerup', (e) => {
+        if (!this._isDragging) return;
+        this._isDragging = false;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        divider.releasePointerCapture(e.pointerId);
+        // 通知 iframe 更新布局
+        this._broadcastResize();
+      });
+
+      divider.addEventListener('pointercancel', (e) => {
+        if (!this._isDragging) return;
+        this._isDragging = false;
+        divider.classList.remove('dragging');
+        document.body.style.cursor = '';
+        try { divider.releasePointerCapture(e.pointerId); } catch (ex) {}
+        this._broadcastResize();
+      });
+
+      // 退出分屏按钮（先显示加载遮罩，再强制保存，最后退出）
+      document.getElementById('btnExitSplit').addEventListener('click', async () => {
+        if (window.electronAPI) {
+          const theme = localStorage.getItem('cfpt-theme') || 'default';
+          await window.electronAPI.showLoading(theme);
+          await new Promise(r => setTimeout(r, 150));
+        }
+        this._forceSaveAndExit();
+      });
+
+      // 监听 iframe 消息
+      window.addEventListener('message', (e) => {
+        this._handleMessage(e);
+      });
+
+      // 监听两个 iframe 加载完成，全部就绪后关闭加载遮罩
+      this._watchIframeReady();
+
+      // 轮询 localStorage 检测 iframe 保存状态，同时触发写盘
+      this._lastSaveStamp = parseInt(localStorage.getItem('gm-assistant-last-save') || '0', 10);
+      setInterval(() => {
+        const stamp = parseInt(localStorage.getItem('gm-assistant-last-save') || '0', 10);
+        if (stamp > this._lastSaveStamp) {
+          this._lastSaveStamp = stamp;
+          this._showSaved();
+          this._scheduleFlush();
+        }
+      }, 500);
+
+      // 设置初始状态（确保元素可见）
+      const sEl = document.getElementById('saveStatus');
+      if (sEl && !sEl.textContent) sEl.textContent = '—';
+      console.log('[SplitShell] saveStatus 初始化:', !!sEl, sEl ? sEl.textContent : 'null');
+    },
+
+    /* 监听两个 iframe 加载完成，全部就绪 + 1s 后关闭外部加载遮罩 */
+    _watchIframeReady() {
+      let loadedCount = 0;
+      const onLoad = () => {
+        loadedCount++;
+        if (loadedCount >= 2) {
+          setTimeout(() => {
+            if (window.electronAPI) {
+              window.electronAPI.hideLoading();
+            }
+          }, 1000);
+        }
+      };
+      const docIframe = document.getElementById('docIframe');
+      const boardIframe = document.getElementById('boardIframe');
+      if (docIframe) docIframe.addEventListener('load', onLoad);
+      if (boardIframe) boardIframe.addEventListener('load', onLoad);
+    },
+
+    _showSaved() {
+      const el = document.getElementById('saveStatus');
+      if (!el) return;
+      el.textContent = '已保存';
+      el.className = 'save-status saved';
+      clearTimeout(this._saveStatusTimer);
+      this._saveStatusTimer = setTimeout(() => {
+        const e = document.getElementById('saveStatus');
+        if (e) { e.textContent = '—'; e.className = 'save-status'; }
+      }, 2500);
+    },
+
+    _showSaving() {
+      const el = document.getElementById('saveStatus');
+      if (!el) return;
+      el.textContent = '保存中…';
+      el.className = 'save-status saving';
+    },
+
+    /* 防抖写盘（2秒），日常自动保存时触发 */
+    _scheduleFlush() {
+      if (this._flushDebounceTimer) clearTimeout(this._flushDebounceTimer);
+      this._flushDebounceTimer = setTimeout(async () => {
+        this._flushDebounceTimer = null;
+        try {
+          await this._flushToDisk();
+          console.log('[SplitShell] 自动写盘完成');
+        } catch (e) {
+          console.error('[SplitShell] 自动写盘失败', e);
+        }
+      }, 2000);
+    },
+
+    _broadcastResize() {
+      const docIframe = document.getElementById('docIframe');
+      const boardIframe = document.getElementById('boardIframe');
+      const msg = { type: 'SPLIT_RESIZE' };
+      if (docIframe && docIframe.contentWindow) {
+        docIframe.contentWindow.postMessage(msg, '*');
+      }
+      if (boardIframe && boardIframe.contentWindow) {
+        boardIframe.contentWindow.postMessage(msg, '*');
+      }
+    },
+
+    async _handleMessage(e) {
+      const data = e.data;
+      if (!data || !data.type) return;
+
+      switch (data.type) {
+        case 'EXIT_SPLIT':
+          this._exitSplit(data.targetPage);
+          break;
+        case 'DOC_UPDATED':
+          this._relayToBoard(data);
+          break;
+        case 'BOARD_UPDATED':
+          this._relayToDoc(data);
+          break;
+        case 'MODULE_CHANGED':
+          this._currentModuleId = data.moduleId;
+          this._broadcast(data);
+          break;
+        case 'ENTRY_ADDED':
+          console.log('[分屏壳] 收到 ENTRY_ADDED, 转发到 board:', data.dbKey, data.entryId);
+          this._relayToBoard(data);
+          break;
+        case 'ENTRY_DELETED':
+          console.log('[分屏壳] 收到 ENTRY_DELETED, 广播:', data.dbKey, data.entryId);
+          this._broadcast(data);
+          break;
+        case 'DB_TYPE_ADDED':
+          console.log('[分屏壳] 收到 DB_TYPE_ADDED, 广播:', data.dbKey);
+          this._broadcast(data);
+          break;
+        case 'DB_TYPE_DELETED':
+          console.log('[分屏壳] 收到 DB_TYPE_DELETED, 广播:', data.dbKey);
+          this._broadcast(data);
+          break;
+        case 'FLUSH_NEEDED':
+          // iframe 通知：数据已写入 localStorage，请求父窗口写盘
+          this._scheduleFlush();
+          break;
+        case 'IPC_PROXY_REQUEST': {
+          // iframe 中的 electronAPI 代理请求：父窗口代为调用真实 IPC
+          const source = e.source;
+          if (!source || !window.electronAPI) break;
+          const method = data.method;
+          const args = data.args || [];
+          const requestId = data.requestId;
+          if (typeof window.electronAPI[method] !== 'function') {
+            source.postMessage({ type: 'IPC_PROXY_RESPONSE', requestId, error: 'Unknown method: ' + method }, '*');
+            break;
+          }
+          try {
+            const result = await window.electronAPI[method](...args);
+            source.postMessage({ type: 'IPC_PROXY_RESPONSE', requestId, result: result }, '*');
+          } catch (err) {
+            source.postMessage({ type: 'IPC_PROXY_RESPONSE', requestId, error: err.message || String(err) }, '*');
+          }
+          break;
+        }
+        default:
+          console.log('[分屏壳] 收到未处理消息:', data.type, data);
+          break;
+      }
+    },
+
+    _relayToBoard(msg) {
+      const boardIframe = document.getElementById('boardIframe');
+      console.log('[分屏壳] _relayToBoard boardIframe:', !!boardIframe, 'contentWindow:', !!(boardIframe && boardIframe.contentWindow));
+      if (boardIframe && boardIframe.contentWindow) {
+        boardIframe.contentWindow.postMessage(msg, '*');
+      }
+    },
+
+    _relayToDoc(msg) {
+      const docIframe = document.getElementById('docIframe');
+      if (docIframe && docIframe.contentWindow) {
+        docIframe.contentWindow.postMessage(msg, '*');
+      }
+    },
+
+    _broadcast(msg) {
+      this._relayToDoc(msg);
+      this._relayToBoard(msg);
+    },
+
+    _forceSaveAndExit() {
+      // 取消待处理的防抖写盘（将直接执行）
+      if (this._flushDebounceTimer) {
+        clearTimeout(this._flushDebounceTimer);
+        this._flushDebounceTimer = null;
+      }
+      // 通知两个 iframe 立即保存（不等防抖）
+      this._showSaving();
+      this._broadcast({ type: 'FORCE_SAVE' });
+      // 等 iframe 写完 localStorage 后，再写回硬盘 JSON 文件，最后退出
+      setTimeout(async () => {
+        try {
+          await this._flushToDisk();
+        } catch (e) {
+          console.error('[SplitShell] 写盘失败', e);
+        }
+        this._exitSplit();
+      }, 600);
+    },
+
+    /* 将 localStorage 中的模组数据写入硬盘 JSON 文件 */
+    async _flushToDisk() {
+      const workDir = localStorage.getItem('gm-assistant-workdir');
+      const modulesJson = localStorage.getItem('gm-assistant-modules');
+      if (!workDir || !modulesJson) return;
+      if (!window.electronAPI) {
+        console.warn('[SplitShell] electronAPI 不可用，跳过写盘');
+        return;
+      }
+      const modules = JSON.parse(modulesJson);
+      for (const mod of modules) {
+        const safeName = (mod.name || 'unnamed').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+        const filePath = workDir + '/' + safeName + '.json';
+        const jsonStr = JSON.stringify(mod, null, 2);
+        try {
+          await window.electronAPI.writeFile(filePath, jsonStr);
+          console.log('[SplitShell] 已写盘:', safeName);
+        } catch (e) {
+          console.error('[SplitShell] 写盘失败 ' + safeName, e);
+        }
+      }
+    },
+
+    _exitSplit(targetPage) {
+      let url = 'index.html';
+      if (this._currentModuleId) {
+        url += '?module=' + encodeURIComponent(this._currentModuleId);
+      }
+      window.location.href = url;
+    }
+  };
+
+  SplitShell.init();
+</script>
+</body>
+</html>

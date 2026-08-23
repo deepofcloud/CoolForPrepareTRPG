@@ -1,0 +1,982 @@
+const fs = require('fs');
+const path = require('path');
+const iconv = require('iconv-lite');
+
+const BASE_DIR = path.resolve('c:\\Users\\沉云\\Desktop\\备团助手\\规则书\\DND5e_chm-main');
+const OUTPUT_FILE = path.resolve('c:\\Users\\沉云\\Desktop\\备团助手\\electron-app\\dnd5r_rules.json');
+
+const SPELL_SCHOOLS = {
+  "咒法": "conjuration",
+  "附魔": "enchantment",
+  "塑能": "evocation",
+  "幻术": "illusion",
+  "死灵": "necromancy",
+  "预言": "divination",
+  "防护": "abjuration",
+  "变化": "transmutation",
+};
+
+function decodeGBK(buffer) {
+  try {
+    return iconv.decode(buffer, 'gbk');
+  } catch {
+    try {
+      return iconv.decode(buffer, 'gb2312');
+    } catch {
+      return buffer.toString('utf-8');
+    }
+  }
+}
+
+function makeId(prefix, cnName, enName) {
+  const slug = enName || cnName;
+  return prefix + slug.replace(/[\s\u3000]+/g, '_').replace(/[^\w\u4e00-\u9fff_-]/g, '');
+}
+
+function cleanHtml(htmlStr) {
+  let result = htmlStr.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+  result = result.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  
+  // Convert FONT to styled span (before saving tables, so tables get converted too)
+  result = result.replace(/<FONT[^>]*>/gi, (match) => {
+    let styles = [];
+    const colorMatch = match.match(/color\s*=\s*(#?\w+)/i);
+    if (colorMatch) styles.push(`color:${colorMatch[1]}`);
+    const sizeMatch = match.match(/size\s*=\s*(\d+)/i);
+    if (sizeMatch) {
+      const sizeMap = {1:'0.67em', 2:'0.83em', 3:'1em', 4:'1.15em', 5:'1.38em', 6:'1.83em', 7:'2.5em'};
+      styles.push('font-size:' + (sizeMap[parseInt(sizeMatch[1])] || '1em'));
+    }
+    return styles.length > 0 ? '<span style="' + styles.join(';') + '">' : '<span>';
+  });
+  result = result.replace(/<\/FONT>/gi, '</span>');
+  
+  // Convert bold/italic format tags to standard HTML
+  result = result.replace(/<STRONG>/gi, '<strong>');
+  result = result.replace(/<\/STRONG>/gi, '</strong>');
+  result = result.replace(/<B>/gi, '<strong>');
+  result = result.replace(/<\/B>/gi, '</strong>');
+  result = result.replace(/<I>/gi, '<em>');
+  result = result.replace(/<\/I>/gi, '</em>');
+  result = result.replace(/<EM>/gi, '<em>');
+  result = result.replace(/<\/EM>/gi, '</em>');
+  
+  // Save table blocks
+  const tableBlocks = [];
+  result = result.replace(/<TABLE[^>]*>[\s\S]*?<\/TABLE>/gi, (match) => {
+    const idx = tableBlocks.length;
+    tableBlocks.push(match);
+    return '__TABLE_BLOCK_' + idx + '__';
+  });
+  
+  // Block-level tags → newline (LI handled separately to add · prefix)
+  const blockTags = 'P|DIV|H[1-6]|UL|OL|BLOCKQUOTE|PRE|DL|DT|DD|HEADER|SECTION|ARTICLE|FOOTER';
+  result = result.replace(new RegExp('<(?:' + blockTags + ')[^>]*>', 'gi'), '\n');
+  result = result.replace(new RegExp('</(?:' + blockTags + ')>', 'gi'), '\n');
+  result = result.replace(/<LI[^>]*>/gi, '\n· ');
+  result = result.replace(/<\/LI>/gi, '\n');
+  result = result.replace(/<BR[^>]*>/gi, '\n');
+  result = result.replace(/<HR[^>]*>/gi, '\n');
+  
+  // Delete remaining non-format tags (preserve strong, em, span and table tags)
+  const keepTags = 'strong|em|span|table|thead|tbody|tr|td|th|caption|colgroup|col';
+  result = result.replace(new RegExp('</?(?!' + keepTags + ')\\b\\w+[^>]*>', 'gi'), '');
+  
+  result = result.replace(/&nbsp;/g, ' ');
+  result = result.replace(/&amp;/g, '&');
+  result = result.replace(/&lt;/g, '<');
+  result = result.replace(/&gt;/g, '>');
+  
+  // Restore table blocks
+  for (let i = 0; i < tableBlocks.length; i++) {
+    let tableHtml = tableBlocks[i];
+    tableHtml = tableHtml.replace(/<TABLE[^>]*>/gi, '<table class="rulebook-table">');
+    tableHtml = tableHtml.replace(/<\/TABLE>/gi, '</table>');
+    tableHtml = tableHtml.replace(/<TR[^>]*>/gi, '<tr>');
+    tableHtml = tableHtml.replace(/<\/TR>/gi, '</tr>');
+    tableHtml = tableHtml.replace(/<TD[^>]*>/gi, '<td>');
+    tableHtml = tableHtml.replace(/<\/TD>/gi, '</td>');
+    tableHtml = tableHtml.replace(/<TH[^>]*>/gi, '<th>');
+    tableHtml = tableHtml.replace(/<\/TH>/gi, '</th>');
+    tableHtml = tableHtml.replace(/\n/g, '');
+    result = result.replace('__TABLE_BLOCK_' + i + '__', tableHtml);
+  }
+  
+  // Merge bullet · with following content (prevent orphan bullets)
+  result = result.replace(/(\u00b7)\s*\n\s*/g, '$1 ');
+  
+  result = result.replace(/[ \t]+/g, ' ');
+  result = result.replace(/\n{3,}/g, '\n\n');
+  result = result.replace(/^\s+|\s+$/g, '');
+  return result;
+}
+
+function parseSpells() {
+  const spells = [];
+  const spellDir = path.join(BASE_DIR, '玩家手册2024', '法术详述');
+  
+  if (!fs.existsSync(spellDir)) {
+    console.log(`[WARN] 法术目录不存在: ${spellDir}`);
+    return spells;
+  }
+  
+  const files = fs.readdirSync(spellDir).filter(f => f.endsWith('.htm')).sort();
+  
+  for (const file of files) {
+    const levelName = file.replace('.htm', '').replace('环', '');
+    let levelInt = parseInt(levelName);
+    if (isNaN(levelInt)) levelInt = 0;
+    
+    const filePath = path.join(spellDir, file);
+    const content = decodeGBK(fs.readFileSync(filePath));
+    
+    const h4Pattern = /<H4[^>]*id="([^"]+)">([^<]+)<\/H4>/g;
+    let match;
+    
+    while ((match = h4Pattern.exec(content)) !== null) {
+      const anchor = match[1];
+      const rawTitle = match[2];
+      
+      const titleParts = rawTitle.split('——');
+      let cnName, enName;
+      if (titleParts.length === 2) {
+        cnName = titleParts[0].trim();
+        enName = titleParts[1].trim();
+      } else {
+        cnName = rawTitle.trim();
+        enName = anchor.replace(/_/g, ' ');
+      }
+      
+      const spellStart = content.indexOf(`<H4`, match.index);
+      const nextH4 = content.indexOf('<H4', spellStart + 10);
+      const bodyEnd = content.indexOf('</body>', spellStart);
+      const spellEnd = nextH4 !== -1 ? nextH4 : bodyEnd;
+      
+      const spellHtml = content.substring(spellStart, spellEnd !== -1 ? spellEnd : content.length);
+      
+      const castTime = (spellHtml.match(/施法时间：([^<]+)/) || [])[1]?.trim() || '';
+      const spellRange = (spellHtml.match(/施法距离：([^<]+)/) || [])[1]?.trim() || '';
+      const components = (spellHtml.match(/法术成分：([^<]+)/) || [])[1]?.trim() || '';
+      const duration = (spellHtml.match(/持续时间：([^<]+)/) || [])[1]?.trim() || '';
+      
+      let school = '';
+      const schoolMatch = rawTitle.match(/《([^》]+)》/);
+      if (schoolMatch) {
+        for (const [cn, en] of Object.entries(SPELL_SCHOOLS)) {
+          if (schoolMatch[1].includes(cn)) {
+            school = en;
+            break;
+          }
+        }
+      }
+      
+      const descStart = spellHtml.indexOf('</H4>');
+      let description = '';
+      if (descStart !== -1) {
+        const descHtml = spellHtml.substring(descStart);
+        description = cleanHtml(descHtml);
+      }
+      
+      spells.push({
+        id: `spell_${anchor}`,
+        type: 'spell',
+        level: levelInt,
+        school: school,
+        name: cnName,
+        englishName: enName,
+        castTime: castTime,
+        range: spellRange,
+        components: components,
+        duration: duration,
+        description: description,
+        source: '玩家手册2024',
+        sourceFile: `法术详述/${file}`,
+      });
+    }
+  }
+  
+  console.log(`[OK] 解析法术: ${spells.length} 个`);
+  return spells;
+}
+
+function parseMonsters() {
+  const monsters = [];
+  const monsterDir = path.join(BASE_DIR, '怪物图鉴2025');
+  
+  if (!fs.existsSync(monsterDir)) {
+    console.log(`[WARN] 怪物目录不存在: ${monsterDir}`);
+    return monsters;
+  }
+  
+  const categories = fs.readdirSync(monsterDir).filter(f => {
+    const fullPath = path.join(monsterDir, f);
+    return fs.statSync(fullPath).isDirectory() && !f.startsWith('.');
+  });
+  
+  for (const category of categories) {
+    const catDir = path.join(monsterDir, category);
+    
+    function scanDir(dir) {
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.htm'));
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(dir, file);
+          const content = decodeGBK(fs.readFileSync(filePath));
+          
+          const h5Match = content.match(/<H5[^>]*id="([^"]+)">([^<]+)<\/H5>/);
+          const h2Match = content.match(/<H2>([^<]+)<\/H2>/);
+          const h1Match = content.match(/<H1>([^<]+)<\/H1>/);
+          
+          let anchor, title;
+          if (h5Match) {
+            anchor = h5Match[1];
+            title = h5Match[2];
+          } else if (h2Match) {
+            anchor = `${category}_${file.replace('.htm', '')}`;
+            title = h2Match[1];
+          } else if (h1Match) {
+            anchor = `${category}_${file.replace('.htm', '')}`;
+            title = h1Match[1];
+          } else {
+            continue;
+          }
+          
+          const titleParts = title.split(' ');
+          let cnName, enName;
+          if (titleParts.length >= 2) {
+            cnName = titleParts[0];
+            enName = titleParts.slice(1).join(' ');
+          } else {
+            cnName = title;
+            enName = '';
+          }
+          
+          const statBlock = {};
+          
+          const acMatch = content.match(/<strong>AC\s*<\/strong>\s*(\d+)/);
+          if (acMatch) statBlock.ac = parseInt(acMatch[1]);
+          
+          const hpMatch = content.match(/<strong>HP\s*<\/strong>\s*(\d+)/);
+          if (hpMatch) statBlock.hp = parseInt(hpMatch[1]);
+          
+          const speedMatch = content.match(/<strong>速度\s*<\/strong>\s*([^<]+)/);
+          if (speedMatch) statBlock.speed = speedMatch[1].trim();
+          
+          const crMatch = content.match(/<strong>CR\s*<\/strong>\s*([^<]+)/);
+          if (crMatch) statBlock.cr = crMatch[1].trim();
+          
+          const abilPattern = /<strong>([^<]+)<\/strong>\s*(\d+)\s*\+(\d+)/g;
+          const abilMap = {};
+          let abilMatch;
+          while ((abilMatch = abilPattern.exec(content)) !== null) {
+            const abilName = abilMatch[1].trim();
+            if (['力量', '敏捷', '体质', '智力', '感知', '魅力'].includes(abilName)) {
+              abilMap[abilName] = { score: parseInt(abilMatch[2]), mod: parseInt(abilMatch[3]) };
+            }
+          }
+          if (Object.keys(abilMap).length > 0) statBlock.abilities = abilMap;
+          
+          const traitsSection = content.indexOf('<h6>特性');
+          const actionsSection = content.indexOf('<h6>动作');
+          const legendarySection = content.indexOf('<h6>传奇');
+          
+          let traitsText = '';
+          if (traitsSection !== -1) {
+            const end = actionsSection > traitsSection ? actionsSection : legendarySection;
+            const actualEnd = end !== -1 ? end : content.indexOf('</div>', traitsSection);
+            if (actualEnd !== -1) {
+              traitsText = cleanHtml(content.substring(traitsSection, actualEnd));
+            }
+          }
+          
+          let actionsText = '';
+          if (actionsSection !== -1) {
+            const end = legendarySection > actionsSection ? legendarySection : content.indexOf('</div>', actionsSection);
+            if (end !== -1) {
+              actionsText = cleanHtml(content.substring(actionsSection, end));
+            }
+          }
+          
+          let legendaryText = '';
+          if (legendarySection !== -1) {
+            const end = content.indexOf('</div>', legendarySection);
+            if (end !== -1) {
+              legendaryText = cleanHtml(content.substring(legendarySection, end));
+            }
+          }
+          
+          let description = '';
+          const descStart = h1Match ? content.indexOf('</H1>') : h2Match ? content.indexOf('</H2>') : 0;
+          if (descStart !== -1) {
+            const descEnd = content.indexOf('<div class="stat-block">');
+            const actualEnd = descEnd !== -1 ? descEnd : content.indexOf('<h6>');
+            if (actualEnd !== -1) {
+              description = cleanHtml(content.substring(descStart, actualEnd));
+            }
+          }
+          
+          const relPath = path.relative(BASE_DIR, filePath).replace(/\\/g, '/');
+          
+          monsters.push({
+            id: `monster_${anchor}`,
+            type: 'monster',
+            name: cnName,
+            englishName: enName,
+            category: category,
+            statBlock: statBlock,
+            traits: traitsText,
+            actions: actionsText,
+            legendaryActions: legendaryText,
+            description: description,
+            source: '怪物图鉴2025',
+            sourceFile: relPath,
+          });
+        } catch (e) {
+          console.log(`[ERR] 解析怪物 ${file}: ${e.message}`);
+        }
+      }
+      
+      const subDirs = fs.readdirSync(dir).filter(f => {
+        const fullPath = path.join(dir, f);
+        return fs.statSync(fullPath).isDirectory();
+      });
+      for (const subDir of subDirs) {
+        scanDir(path.join(dir, subDir));
+      }
+    }
+    
+    scanDir(catDir);
+  }
+  
+  console.log(`[OK] 解析怪物: ${monsters.length} 个`);
+  return monsters;
+}
+
+function parseWeapons() {
+  const weapons = [];
+  const weaponsFile = path.join(BASE_DIR, '玩家手册2024', '装备', '武器.htm');
+  
+  if (!fs.existsSync(weaponsFile)) {
+    console.log(`[WARN] 武器文件不存在: ${weaponsFile}`);
+    return weapons;
+  }
+  
+  const content = decodeGBK(fs.readFileSync(weaponsFile));
+  const tablePattern = /<TABLE[^>]*>([\s\S]*?)<\/TABLE>/g;
+  let tableMatch;
+  
+  while ((tableMatch = tablePattern.exec(content)) !== null) {
+    const tableHtml = tableMatch[1];
+    const trPattern = /<TR[^>]*>([\s\S]*?)<\/TR>/g;
+    const rows = [];
+    let trMatch;
+    
+    while ((trMatch = trPattern.exec(tableHtml)) !== null) {
+      rows.push(trMatch[1]);
+    }
+    
+    if (rows.length < 2) continue;
+    
+    const headerText = cleanHtml(rows[0]);
+    let category = '';
+    if (headerText.includes('简单')) category = '简单武器';
+    else if (headerText.includes('格斗') || headerText.toLowerCase().includes('martial')) category = '格斗武器';
+    
+    for (let i = 1; i < rows.length; i++) {
+      const tdPattern = /<TD[^>]*>([\s\S]*?)<\/TD>/g;
+      const cells = [];
+      let tdMatch;
+      
+      while ((tdMatch = tdPattern.exec(rows[i])) !== null) {
+        cells.push(tdMatch[1]);
+      }
+      
+      if (cells.length >= 6) {
+        const nameCell = cleanHtml(cells[0]);
+        const nameParts = nameCell.split(' ');
+        let cnName, enName;
+        if (nameParts.length >= 2) {
+          cnName = nameParts[0];
+          enName = nameParts.slice(1).join(' ');
+        } else {
+          cnName = nameCell;
+          enName = '';
+        }
+        
+        const damage = cleanHtml(cells[1]);
+        const properties = cleanHtml(cells[2]);
+        const mastery = cleanHtml(cells[3]);
+        const weight = cleanHtml(cells[4]);
+        const price = cleanHtml(cells[5]);
+        
+        weapons.push({
+          id: makeId('weapon_', cnName, enName),
+          type: 'weapon',
+          category: category,
+          name: cnName,
+          englishName: enName,
+          damage: damage,
+          properties: properties,
+          mastery: mastery,
+          weight: weight,
+          price: price,
+          source: '玩家手册2024',
+          sourceFile: '装备/武器.htm',
+        });
+      }
+    }
+  }
+  
+  console.log(`[OK] 解析武器: ${weapons.length} 个`);
+  return weapons;
+}
+
+function parseArmor() {
+  const armor = [];
+  const armorFile = path.join(BASE_DIR, '玩家手册2024', '装备', '护甲.htm');
+  
+  if (!fs.existsSync(armorFile)) {
+    console.log(`[WARN] 护甲文件不存在: ${armorFile}`);
+    return armor;
+  }
+  
+  const content = decodeGBK(fs.readFileSync(armorFile));
+  const tablePattern = /<TABLE[^>]*>([\s\S]*?)<\/TABLE>/g;
+  let tableMatch;
+  
+  while ((tableMatch = tablePattern.exec(content)) !== null) {
+    const tableHtml = tableMatch[1];
+    const trPattern = /<TR[^>]*>([\s\S]*?)<\/TR>/g;
+    const rows = [];
+    let trMatch;
+    
+    while ((trMatch = trPattern.exec(tableHtml)) !== null) {
+      rows.push(trMatch[1]);
+    }
+    
+    for (let i = 1; i < rows.length; i++) {
+      const tdPattern = /<TD[^>]*>([\s\S]*?)<\/TD>/g;
+      const cells = [];
+      let tdMatch;
+      
+      while ((tdMatch = tdPattern.exec(rows[i])) !== null) {
+        cells.push(tdMatch[1]);
+      }
+      
+      if (cells.length >= 6) {
+        const nameCell = cleanHtml(cells[0]);
+        const nameParts = nameCell.split(' ');
+        let cnName, enName;
+        if (nameParts.length >= 2) {
+          cnName = nameParts[0];
+          enName = nameParts.slice(1).join(' ');
+        } else {
+          cnName = nameCell;
+          enName = '';
+        }
+        
+        const ac = cleanHtml(cells[1]);
+        const strengthReq = cleanHtml(cells[2]);
+        const stealth = cleanHtml(cells[3]);
+        const weight = cleanHtml(cells[4]);
+        const price = cleanHtml(cells[5]);
+        
+        let category = '';
+        if (nameCell.includes('轻甲')) category = '轻甲';
+        else if (nameCell.includes('中甲')) category = '中甲';
+        else if (nameCell.includes('重甲')) category = '重甲';
+        
+        armor.push({
+          id: makeId('armor_', cnName, enName),
+          type: 'armor',
+          category: category,
+          name: cnName,
+          englishName: enName,
+          ac: ac,
+          strengthReq: strengthReq,
+          stealth: stealth,
+          weight: weight,
+          price: price,
+          source: '玩家手册2024',
+          sourceFile: '装备/护甲.htm',
+        });
+      }
+    }
+  }
+  
+  console.log(`[OK] 解析护甲: ${armor.length} 个`);
+  return armor;
+}
+
+function parseEquipment() {
+  const equipment = [];
+  const equipDir = path.join(BASE_DIR, '玩家手册2024', '装备');
+  
+  if (!fs.existsSync(equipDir)) {
+    console.log(`[WARN] 装备目录不存在: ${equipDir}`);
+    return equipment;
+  }
+  
+  const files = fs.readdirSync(equipDir).filter(f => f.endsWith('.htm') && !['武器.htm', '护甲.htm'].includes(f));
+  
+  for (const file of files) {
+    const filePath = path.join(equipDir, file);
+    const content = decodeGBK(fs.readFileSync(filePath));
+    
+    const tablePattern = /<TABLE[^>]*>([\s\S]*?)<\/TABLE>/g;
+    let tableMatch;
+    
+    while ((tableMatch = tablePattern.exec(content)) !== null) {
+      const tableHtml = tableMatch[1];
+      const trPattern = /<TR[^>]*>([\s\S]*?)<\/TR>/g;
+      const rows = [];
+      let trMatch;
+      
+      while ((trMatch = trPattern.exec(tableHtml)) !== null) {
+        rows.push(trMatch[1]);
+      }
+      
+      for (let i = 1; i < rows.length; i++) {
+        const tdPattern = /<TD[^>]*>([\s\S]*?)<\/TD>/g;
+        const cells = [];
+        let tdMatch;
+        
+        while ((tdMatch = tdPattern.exec(rows[i])) !== null) {
+          cells.push(tdMatch[1]);
+        }
+        
+        if (cells.length >= 2) {
+          const nameCell = cleanHtml(cells[0]);
+          const nameParts = nameCell.split(' ');
+          let cnName, enName;
+          if (nameParts.length >= 2) {
+            cnName = nameParts[0];
+            enName = nameParts.slice(1).join(' ');
+          } else {
+            cnName = nameCell;
+            enName = '';
+          }
+          
+          const price = cells.length > 0 ? cleanHtml(cells[cells.length - 1]) : '';
+          
+          equipment.push({
+            id: makeId('equip_', cnName, enName),
+            type: 'equipment',
+            category: file.replace('.htm', ''),
+            name: cnName,
+            englishName: enName,
+            price: price,
+            source: '玩家手册2024',
+            sourceFile: `装备/${file}`,
+          });
+        }
+      }
+    }
+  }
+  
+  console.log(`[OK] 解析装备: ${equipment.length} 个`);
+  return equipment;
+}
+
+function parseFeats() {
+  const feats = [];
+  const featDir = path.join(BASE_DIR, '玩家手册2024', '专长');
+  
+  if (!fs.existsSync(featDir)) {
+    console.log(`[WARN] 专长目录不存在: ${featDir}`);
+    return feats;
+  }
+  
+  const files = fs.readdirSync(featDir).filter(f => f.endsWith('.htm'));
+  
+  for (const file of files) {
+    const filePath = path.join(featDir, file);
+    const content = decodeGBK(fs.readFileSync(filePath));
+    
+    const h2Match = content.match(/<h2[^>]*>([^<]+)<\/h2>/i);
+    const category = h2Match ? h2Match[1] : file.replace('.htm', '');
+    
+    const pPattern = /<p[^>]*>([\s\S]*?)<\/p>/g;
+    const paragraphs = [];
+    let pMatch;
+    
+    while ((pMatch = pPattern.exec(content)) !== null) {
+      paragraphs.push(pMatch[1]);
+    }
+    
+    let currentFeat = null;
+    
+    for (const p of paragraphs) {
+      const coloredMatch = p.match(/<FONT color=#800000><b>([^<]+)<\/b><\/FONT>/);
+      if (coloredMatch) {
+        if (currentFeat) {
+          feats.push(currentFeat);
+        }
+        
+        const name = cleanHtml(coloredMatch[1]);
+        const nameParts = name.split(' ');
+        let cnName, enName;
+        if (nameParts.length >= 2) {
+          cnName = nameParts[0];
+          enName = nameParts.slice(1).join(' ');
+        } else {
+          cnName = name;
+          enName = '';
+        }
+        
+        const italicMatch = p.match(/<i>([^<]+)<\/i>/);
+        const prereq = italicMatch ? cleanHtml(italicMatch[1]) : '';
+        
+        currentFeat = {
+          id: makeId('feat_', cnName, enName),
+          type: 'feat',
+          category: category,
+          name: cnName,
+          englishName: enName,
+          prerequisite: prereq,
+          description: '',
+          source: '玩家手册2024',
+          sourceFile: `专长/${file}`,
+        };
+      } else if (currentFeat) {
+        const descText = cleanHtml(p);
+        if (descText && descText.length > 10) {
+          currentFeat.description += descText + ' ';
+        }
+      }
+    }
+    
+    if (currentFeat) {
+      feats.push(currentFeat);
+    }
+  }
+  
+  console.log(`[OK] 解析专长: ${feats.length} 个`);
+  return feats;
+}
+
+function parseMagicItems() {
+  const magicItems = [];
+  const magicDir = path.join(BASE_DIR, '城主指南2024', '7.宝藏', '魔法物品详述');
+  
+  if (!fs.existsSync(magicDir)) {
+    console.log(`[WARN] 魔法物品目录不存在: ${magicDir}`);
+    return magicItems;
+  }
+  
+  const categories = fs.readdirSync(magicDir).filter(f => {
+    const fullPath = path.join(magicDir, f);
+    return fs.statSync(fullPath).isDirectory();
+  });
+  
+  for (const category of categories) {
+    const catDir = path.join(magicDir, category);
+    const files = fs.readdirSync(catDir).filter(f => f.endsWith('.htm'));
+    
+    for (const file of files) {
+      try {
+        const filePath = path.join(catDir, file);
+        const content = decodeGBK(fs.readFileSync(filePath));
+        
+        const h1Match = content.match(/<H1[^>]*>([^<]+)<\/H1>/);
+        const h2Match = content.match(/<H2[^>]*>([^<]+)<\/H2>/);
+        
+        let title;
+        if (h1Match) title = h1Match[1];
+        else if (h2Match) title = h2Match[1];
+        else title = file.replace('.htm', '');
+        
+        const titleParts = title.split('——');
+        let cnName, enName;
+        if (titleParts.length === 2) {
+          cnName = titleParts[0].trim();
+          enName = titleParts[1].trim();
+        } else {
+          cnName = title.trim();
+          enName = '';
+        }
+        
+        let description = '';
+        const descStart = h1Match ? content.indexOf('</H1>') : h2Match ? content.indexOf('</H2>') : 0;
+        if (descStart !== -1) {
+          const descEnd = content.indexOf('<TABLE');
+          const actualEnd = descEnd !== -1 ? descEnd : content.indexOf('</body>');
+          if (actualEnd !== -1) {
+            description = cleanHtml(content.substring(descStart, actualEnd));
+          }
+        }
+        
+        const rarityMatch = content.match(/稀有度[^：:]*[：:]\s*([^<]+)/);
+        const rarity = rarityMatch ? rarityMatch[1].trim() : '';
+        
+        const relPath = path.relative(BASE_DIR, filePath).replace(/\\/g, '/');
+        
+        magicItems.push({
+          id: makeId('magic_', cnName, enName),
+          type: 'magic_item',
+          category: category,
+          name: cnName,
+          englishName: enName,
+          rarity: rarity,
+          description: description,
+          source: '城主指南2024',
+          sourceFile: relPath,
+        });
+      } catch (e) {
+        console.log(`[ERR] 解析魔法物品 ${file}: ${e.message}`);
+      }
+    }
+  }
+  
+  console.log(`[OK] 解析魔法物品: ${magicItems.length} 个`);
+  return magicItems;
+}
+
+function parseRules() {
+  const rules = [];
+  const books = [
+    ['玩家手册2024', path.join(BASE_DIR, '玩家手册2024')],
+    ['城主指南2024', path.join(BASE_DIR, '城主指南2024')],
+    ['怪物图鉴2025', path.join(BASE_DIR, '怪物图鉴2025')],
+  ];
+  
+  for (const [bookName, bookDir] of books) {
+    if (!fs.existsSync(bookDir)) {
+      console.log(`[WARN] 规则书目录不存在: ${bookDir}`);
+      continue;
+    }
+    
+    function scanDir(dir) {
+      const files = fs.readdirSync(dir).filter(f => f.endsWith('.htm'));
+      
+      for (const file of files) {
+        try {
+          const filePath = path.join(dir, file);
+          const content = decodeGBK(fs.readFileSync(filePath));
+          
+          const titleMatch = content.match(/<title[^>]*>([^<]+)<\/title>/);
+          const title = titleMatch ? titleMatch[1] : file.replace('.htm', '');
+          const cleanTitle = cleanHtml(title);
+          
+          const bodyStart = content.indexOf('<body>');
+          const bodyEnd = content.indexOf('</body>');
+          
+          let fullText = '';
+          if (bodyStart !== -1 && bodyEnd !== -1) {
+            fullText = cleanHtml(content.substring(bodyStart, bodyEnd));
+          } else {
+            fullText = cleanHtml(content);
+          }
+          
+          const relPath = path.relative(BASE_DIR, filePath).replace(/\\/g, '/');
+          
+          rules.push({
+            id: `rule_${relPath.replace(/\//g, '_').replace('.htm', '')}`,
+            type: 'rule',
+            name: cleanTitle,
+            description: fullText,
+            source: bookName,
+            sourceFile: relPath,
+          });
+        } catch (e) {
+          console.log(`[ERR] 解析规则文件 ${file}: ${e.message}`);
+        }
+      }
+      
+      const subDirs = fs.readdirSync(dir).filter(f => {
+        const fullPath = path.join(dir, f);
+        return fs.statSync(fullPath).isDirectory() && !f.startsWith('.');
+      });
+      for (const subDir of subDirs) {
+        scanDir(path.join(dir, subDir));
+      }
+    }
+    
+    scanDir(bookDir);
+  }
+  
+  console.log(`[OK] 解析规则说明: ${rules.length} 个`);
+  return rules;
+}
+
+function parseRaces() {
+  const races = [];
+  const raceDir = path.join(BASE_DIR, '玩家手册2024', '角色起源', '种族');
+  
+  if (!fs.existsSync(raceDir)) {
+    console.log(`[WARN] 种族目录不存在: ${raceDir}`);
+    return races;
+  }
+  
+  const files = fs.readdirSync(raceDir).filter(f => f.endsWith('.htm'));
+  
+  for (const file of files) {
+    const filePath = path.join(raceDir, file);
+    const content = decodeGBK(fs.readFileSync(filePath));
+    
+    const h1Match = content.match(/<H1[^>]*>([^<]+)<\/H1>/);
+    let cnName, enName;
+    if (h1Match) {
+      const title = h1Match[1];
+      const titleParts = title.split(' ');
+      if (titleParts.length >= 2) {
+        cnName = titleParts[0];
+        enName = titleParts.slice(1).join(' ');
+      } else {
+        cnName = title;
+        enName = '';
+      }
+    } else {
+      cnName = file.replace('.htm', '');
+      enName = '';
+    }
+    
+    let description = '';
+    const bodyStart = content.indexOf('</H1>');
+    if (bodyStart !== -1) {
+      const bodyEnd = content.indexOf('</body>');
+      if (bodyEnd !== -1) {
+        description = cleanHtml(content.substring(bodyStart, bodyEnd));
+      }
+    }
+    
+    races.push({
+      id: makeId('race_', cnName, enName),
+      type: 'race',
+      name: cnName,
+      englishName: enName,
+      description: description,
+      source: '玩家手册2024',
+      sourceFile: `角色起源/种族/${file}`,
+    });
+  }
+  
+  console.log(`[OK] 解析种族: ${races.length} 个`);
+  return races;
+}
+
+function parseClasses() {
+  const classes = [];
+  const classDir = path.join(BASE_DIR, '玩家手册2024', '角色职业');
+  
+  if (!fs.existsSync(classDir)) {
+    console.log(`[WARN] 职业目录不存在: ${classDir}`);
+    return classes;
+  }
+  
+  const categories = fs.readdirSync(classDir).filter(f => {
+    const fullPath = path.join(classDir, f);
+    return fs.statSync(fullPath).isDirectory();
+  });
+  
+  for (const category of categories) {
+    const catDir = path.join(classDir, category);
+    const files = fs.readdirSync(catDir).filter(f => f.endsWith('.htm') && !f.includes('法术列表'));
+    
+    for (const file of files) {
+      try {
+        const filePath = path.join(catDir, file);
+        const content = decodeGBK(fs.readFileSync(filePath));
+        
+        const h1Match = content.match(/<H1[^>]*>([^<]+)<\/H1>/);
+        const h2Match = content.match(/<H2[^>]*>([^<]+)<\/H2>/);
+        
+        let title;
+        if (h1Match) title = h1Match[1];
+        else if (h2Match) title = h2Match[1];
+        else title = file.replace('.htm', '');
+        
+        const titleParts = title.split(' ');
+        let cnName, enName;
+        if (titleParts.length >= 2) {
+          cnName = titleParts[0];
+          enName = titleParts.slice(1).join(' ');
+        } else {
+          cnName = title;
+          enName = '';
+        }
+        
+        let description = '';
+        const bodyStart = h1Match ? content.indexOf('</H1>') : h2Match ? content.indexOf('</H2>') : 0;
+        if (bodyStart !== -1) {
+          const bodyEnd = content.indexOf('</body>');
+          if (bodyEnd !== -1) {
+            description = cleanHtml(content.substring(bodyStart, bodyEnd));
+          }
+        }
+        
+        const relPath = path.relative(BASE_DIR, filePath).replace(/\\/g, '/');
+        
+        classes.push({
+          id: makeId('class_', cnName, enName),
+          type: 'class',
+          category: category,
+          name: cnName,
+          englishName: enName,
+          description: description,
+          source: '玩家手册2024',
+          sourceFile: relPath,
+        });
+      } catch (e) {
+        console.log(`[ERR] 解析职业 ${file}: ${e.message}`);
+      }
+    }
+  }
+  
+  console.log(`[OK] 解析职业: ${classes.length} 个`);
+  return classes;
+}
+
+function main() {
+  console.log('='.repeat(60));
+  console.log('开始解析 D&D 5R 规则书');
+  console.log('='.repeat(60));
+  
+  const allData = {
+    version: '1.0',
+    lastUpdated: '2026-07-11',
+    spells: [],
+    monsters: [],
+    weapons: [],
+    armor: [],
+    equipment: [],
+    feats: [],
+    magicItems: [],
+    rules: [],
+    races: [],
+    classes: [],
+  };
+  
+  allData.spells = parseSpells();
+  allData.monsters = parseMonsters();
+  allData.weapons = parseWeapons();
+  allData.armor = parseArmor();
+  allData.equipment = parseEquipment();
+  allData.feats = parseFeats();
+  allData.magicItems = parseMagicItems();
+  allData.rules = parseRules();
+  allData.races = parseRaces();
+  allData.classes = parseClasses();
+  
+  let totalEntries = 0;
+  for (const key of Object.keys(allData)) {
+    if (Array.isArray(allData[key])) {
+      totalEntries += allData[key].length;
+    }
+  }
+  
+  console.log(`\n[OK] 总条目数: ${totalEntries}`);
+  
+  const outputDir = path.dirname(OUTPUT_FILE);
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
+  
+  fs.writeFileSync(OUTPUT_FILE, JSON.stringify(allData, null, 2), 'utf-8');
+  
+  console.log(`\n[OK] 已保存到: ${OUTPUT_FILE}`);
+  console.log('='.repeat(60));
+}
+
+main();

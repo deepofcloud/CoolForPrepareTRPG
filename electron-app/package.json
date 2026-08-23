@@ -1,0 +1,71 @@
+{
+  "name": "CoolForPrepareTRPG",
+  "version": "0.9.1C",
+  "description": "御备团 (CoolForPrepareTRPG) - GM 备团与带团效率工具",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "author": "刘昊坤",
+  "license": "GPL-3.0",
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.cfpt.desktop",
+    "productName": "御备团CoolForPrepareTRPG",
+    "icon": "icon.ico",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "御备团",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "app.js",
+      "home-background.js",
+      "styles.css",
+      "icon.ico",
+      "index.html",
+      "split-screen.html",
+      "loading-overlay.html",
+      "board.html",
+      "doc-editor.html",
+      "shared.js",
+      "libs/**/*",
+      "tutorial/**/*",
+      "dnd5r_rules.json",
+      "item_database.js",
+      "spell_database.js"
+    ],
+    "extraResources": [
+      {
+        "from": "tutorial",
+        "to": "tutorial"
+      }
+    ]
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

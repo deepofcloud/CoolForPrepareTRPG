@@ -1,0 +1,11 @@
+# 依赖
+node_modules/
+
+# 包管理
+package-lock.json
+
+# 备份文件
+*.backup
+
+# 三方库（源码不应被索引）
+libs/
